@@ -37,7 +37,14 @@ export default function Navbar() {
                             referrerPolicy="no-referrer"
                         />
                         <div className="user-info">
-                            <span className="user-name">{user.name}</span>
+                            <span className="user-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {user.name}
+                                {user.tier === 'pro' && (
+                                    <span style={{ fontSize: '0.65rem', background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', padding: '2px 6px', borderRadius: '8px', fontWeight: 700, letterSpacing: '0.5px' }}>
+                                        PRO
+                                    </span>
+                                )}
+                            </span>
                             <span className="user-email">{user.email}</span>
                         </div>
                         <button className="btn-logout" onClick={logout}>

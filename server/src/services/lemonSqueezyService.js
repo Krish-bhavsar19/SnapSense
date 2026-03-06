@@ -34,7 +34,9 @@ async function createCheckoutSession(user) {
             expiresAt: null,
             preview: true, // Set to false in production
             testMode: true, // Set to false in production
-            redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true`,
+            productOptions: {
+                redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true`,
+            }
         });
 
         if (!checkout.data?.data?.attributes?.url) {

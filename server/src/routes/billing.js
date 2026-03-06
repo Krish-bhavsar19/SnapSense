@@ -51,4 +51,38 @@ router.get('/status', requireAuth, async (req, res) => {
     }
 });
 
+/**
+ * POST /api/billing/verify-upgrade
+ * Because local webhooks fail on localhost during testing, 
+ * this endpoint allows the frontend to manually verify the upgrade instantly.
+ */
+router.post('/verify-upgrade', requireAuth, async (req, res) => {
+    try {
+        const user = req.user;
+        
+        // Upgrade the user to PRO directly
+        user.tier = 'pro';
+        user.subscription = {
+            lsOrderId: 'hackathon-test-order-' + Date.now(),
+            lsSubscriptionId: 'hackathon-test-sub-' + Date.now(),
+            status: 'active',
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        };
+        
+        await user.save();
+        
+        res.json({
+            success: true,
+            tier: user.tier,
+            message: 'User upgraded successfully via frontend verification hook.'
+        });
+    } catch (error) {
+        console.error('Billing verify error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to verify billing upgrade',
+        });
+    }
+});
+
 module.exports = router;

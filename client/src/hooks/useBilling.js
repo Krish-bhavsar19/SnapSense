@@ -14,8 +14,25 @@ export default function useBilling() {
     useEffect(() => {
         const scriptId = 'lemonsqueezy-embed-script'
         
+        // Setup Lemon Squeezy to listen for successful checkouts
+        window.createLemonSqueezy = () => {
+            window.LemonSqueezy.Setup({
+                eventHandler: (event) => {
+                    console.log('Lemon Squeezy event:', event)
+                    if (event.event === 'Checkout.Success') {
+                        // Immediately close the overlay and redirect
+                        window.LemonSqueezy.Url.Close()
+                        window.location.href = '/dashboard?upgraded=true'
+                    }
+                }
+            })
+        }
+
         // Check if script already exists
         if (document.getElementById(scriptId)) {
+            if (window.LemonSqueezy) {
+                window.createLemonSqueezy()
+            }
             return
         }
 
@@ -31,6 +48,7 @@ export default function useBilling() {
             if (existingScript) {
                 existingScript.remove()
             }
+            delete window.createLemonSqueezy
         }
     }, [])
 
@@ -54,8 +72,8 @@ export default function useBilling() {
             if (window.LemonSqueezy && window.LemonSqueezy.Url) {
                 window.LemonSqueezy.Url.Open(data.checkoutUrl)
             } else {
-                // Fallback: open in new tab if embed not loaded
-                window.open(data.checkoutUrl, '_blank')
+                // Fallback: open in same tab if embed not loaded
+                window.location.href = data.checkoutUrl
             }
 
             // Step 3: Poll billing status to detect upgrade
@@ -79,10 +97,14 @@ export default function useBilling() {
                             onSuccess()
                         }
                         
-                        // Reload page to update UI
+                        if (window.LemonSqueezy && window.LemonSqueezy.Url) {
+                            window.LemonSqueezy.Url.Close()
+                        }
+                        
+                        // Redirect instead of reloading
                         setTimeout(() => {
-                            window.location.reload()
-                        }, 1500)
+                            window.location.href = '/dashboard?upgraded=true'
+                        }, 1000)
                         
                         return
                     }

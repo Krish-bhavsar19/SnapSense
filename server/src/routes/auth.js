@@ -84,6 +84,27 @@ router.post('/merge', requireAuth, async (req, res) => {
             return res.json({ success: true, message: 'No pending actions on server to merge', merged: 0 });
         }
 
+        // ─── TIER VERIFICATION CHECK ────────────────────────────────────────────────
+        // Check if the user is on the Pro tier
+        const isPro = user.tier === 'pro';
+
+        // Get the current screenshot count (default to 0 for new or old users without the field)
+        const currentCount = user.screenshotCount || 0;
+        const incomingCount = pendingActions.length;
+        
+        // If they are on the Free tier, checking if merging these would exceed the 10 limit
+        if (!isPro && (currentCount + incomingCount) > 10) {
+            console.log(`⚠️  [Merge] User ${user._id} limit exceeded by merge attempt. Current: ${currentCount}, Incoming: ${incomingCount}`);
+            // Do NOT delete the session yet, allow the user to upgrade to Pro first to save them
+            return res.status(402).json({ 
+                success: false, 
+                limitReached: true,
+                message: `Merging these ${incomingCount} screenshots exceeds your 10 free quota. Upgrade to Pro to save them!`, 
+                merged: 0 
+            });
+        }
+        // ────────────────────────────────────────────────────────────────────────────
+
         const results = [];
 
         // Match server actions with client-side verified cards
@@ -233,7 +254,18 @@ router.post('/merge', requireAuth, async (req, res) => {
 
         // Clean up the AnonymousSession
         await AnonymousSession.deleteOne({ sessionId });
-        await User.findByIdAndUpdate(user._id, { $inc: { totalUploads: results.filter(r => r.status === 'completed').length } });
+        
+        // ─── COUNTER UPDATES ───────────────────────────────────────────────
+        // Both totalUploads and screenshotCount are incremented to ensure
+        // the user's dashboard limits visually sync with their total screenshots.
+        // ───────────────────────────────────────────────────────────────────
+        const mergedCount = results.filter(r => r.status === 'completed').length;
+        await User.findByIdAndUpdate(user._id, { 
+            $inc: { 
+                totalUploads: mergedCount,
+                screenshotCount: mergedCount 
+            } 
+        });
 
         return res.json({
             success: true,

@@ -5,6 +5,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import UploadZone from '../components/UploadZone'
 import { useAuth } from '../context/AuthContext'
+import UpgradeModal from '../components/UpgradeModal'
 
 const CATEGORY_META = {
     'Ticket': { icon: '🎫', color: '#f59e0b' },
@@ -24,7 +25,7 @@ const CATEGORY_META = {
 }
 
 export default function Dashboard() {
-    const { user } = useAuth()
+    const { user, fetchUser } = useAuth()
     const [stats, setStats] = useState({ total: 0, byCategory: [] })
     const [recent, setRecent] = useState([])
     const [loading, setLoading] = useState(true)
@@ -33,6 +34,11 @@ export default function Dashboard() {
         screenshotCount: 0,
         limit: 10,
     })
+    
+    // Upgrade Modal State
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeTrigger, setUpgradeTrigger] = useState('manual')
+    
     const mergeInProgress = useRef(false)
 
     const fetchData = async () => {
@@ -81,13 +87,26 @@ export default function Dashboard() {
                     `🎉 Saved ${res.data.merged} screenshot${res.data.merged > 1 ? 's' : ''} from your preview session!`,
                     { duration: 6000 }
                 )
+                // Clean up local storage ONLY if successful
+                localStorage.removeItem('snap_session_id')
+                localStorage.removeItem('snap_pending_cards')
                 fetchData()
             }
         } catch (err) {
-            console.error('Auto-merge failed (non-critical):', err.message)
+            // Check if it's the 402 limit reached error
+            if (err.response?.status === 402) {
+                setUpgradeTrigger('limit_reached')
+                setShowUpgradeModal(true)
+                // We deliberately do NOT remove local storage here so they can upgrade and sync later.
+                toast.error(err.response?.data?.message || 'Free tier limit reached for merging', { duration: 5000 })
+            } else {
+                console.error('Auto-merge failed (non-critical):', err.message)
+                // Clean up on generic errors so it doesn't get stuck forever
+                localStorage.removeItem('snap_session_id')
+                localStorage.removeItem('snap_pending_cards')
+            }
         } finally {
-            localStorage.removeItem('snap_session_id')
-            localStorage.removeItem('snap_pending_cards')
+            mergeInProgress.current = false
         }
     }
 
@@ -99,13 +118,20 @@ export default function Dashboard() {
         // Check if redirected from successful payment
         const urlParams = new URLSearchParams(window.location.search)
         if (urlParams.get('upgraded') === 'true') {
-            toast.success('🎉 Payment successful! Checking your Pro status...', { duration: 3000 })
+            toast.success('🎉 Payment successful! Setting up your Pro account...', { duration: 3000 })
             // Clear the URL parameter
             window.history.replaceState({}, '', '/dashboard')
-            // Refresh data to get updated tier
-            setTimeout(() => {
-                fetchData()
-            }, 2000)
+            
+            // Because local webhooks won't trigger, manually trigger an upgrade verification
+            axios.post('/api/billing/verify-upgrade')
+                .then(() => {
+                    toast.success('Welcome to Pro! Enjoy unlimited uploads! ✨')
+                    fetchUser() // Forces the Navbar user state to sync with 'pro' tier
+                    fetchData() // Syncs local billing status
+                })
+                .catch(() => {
+                    fetchData() // Fallback check
+                })
         }
     }, [])
 
@@ -232,6 +258,13 @@ export default function Dashboard() {
                     <p>Drop your first screenshot above to get started!</p>
                 </div>
             )}
+            
+            {/* Upgrade Modal for Merge Interruption */}
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                trigger={upgradeTrigger}
+            />
         </div>
     )
 }
