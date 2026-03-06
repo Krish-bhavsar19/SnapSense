@@ -75,7 +75,23 @@ const connectDB = async () => {
     app.use('/auth', authRoutes);
     app.use('/api/screenshots', screenshotRoutes);
 
+    // ─── Production Frontend Serving ──────────────────────────────────────────
+    if (process.env.NODE_ENV === 'production') {
+      const path = require('path');
+      const clientDistPath = path.join(__dirname, '../../client/dist');
+      
+      // Serve static files from the client dist folder
+      app.use(express.static(clientDistPath));
+
+      // Catch-all route to serve index.html for client-side routing
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(clientDistPath, 'index.html'));
+      });
+      console.log('🌐 Serving production frontend from client/dist');
+    }
+
     console.log('✅ All routes registered — App fully ready!');
+
   } catch (err) {
     console.error('\n❌ MongoDB connection failed:', err.message);
     console.error('💡 Fix Options:');
