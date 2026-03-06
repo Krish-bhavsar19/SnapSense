@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
+const { checkUploadLimit } = require('../middleware/tierCheck');
 const { classifyScreenshot } = require('../services/groqService');
 const { uploadFileToDrive } = require('../services/driveService');
 const { appendRow, appendQuoteRow, appendTransactionRow, appendLocationRow } = require('../services/sheetsService');
@@ -121,8 +122,7 @@ async function executeGoogleActions(user, buffer, filename, mimetype, aiResult) 
 // ─── POST /api/screenshots/upload ────────────────────────────────────────────
 router.post(
     '/upload',
-    requireAuth,
-    upload.single('screenshot'),
+    requireAuth,    checkUploadLimit,    upload.single('screenshot'),
     async (req, res) => {
         try {
             if (!req.file) {
@@ -173,7 +173,13 @@ router.post(
                 sheetsRowNumber,
             });
 
-            await User.findByIdAndUpdate(user._id, { $inc: { totalUploads: 1 } });
+            // Increment upload counters
+            await User.findByIdAndUpdate(user._id, { 
+                $inc: { 
+                    totalUploads: 1,
+                    screenshotCount: 1 // Increment for free tier limit tracking
+                } 
+            });
 
             return res.status(201).json({
                 success: true,

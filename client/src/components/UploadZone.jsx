@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Sparkles } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import UpgradeModal from './UpgradeModal'
 
 const CATEGORY_META = {
     'Ticket': { icon: '🎫', color: '#f59e0b' },
@@ -20,16 +22,42 @@ const CATEGORY_META = {
     'Other': { icon: '🗂️', color: '#6b7280' },
 }
 
-export default function UploadZone({ onSuccess }) {
+export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10, tier = 'free' }) {
     const [uploading, setUploading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [result, setResult] = useState(null)
     const [preview, setPreview] = useState(null)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeTrigger, setUpgradeTrigger] = useState('manual')
+
+    const isFreeTier = tier === 'free'
+    const limitReached = isFreeTier && screenshotCount >= limit
+
+    // Usage badge color logic
+    const getUsageBadgeClass = () => {
+        if (tier === 'pro') return 'usage-badge pro'
+        if (screenshotCount >= 10) return 'usage-badge danger'
+        if (screenshotCount >= 7) return 'usage-badge warning'
+        return 'usage-badge success'
+    }
 
     const onDrop = useCallback(
         async (acceptedFiles) => {
             const file = acceptedFiles[0]
             if (!file) return
+
+            // File size check (max 10MB)
+            const maxSize = 10 * 1024 * 1024 // 10MB
+            if (file.size > maxSize) {
+                toast.error('File too large. Maximum size is 10MB.')
+                return
+            }
+
+            // File type check
+            if (!file.type.startsWith('image/')) {
+                toast.error('Only image files are allowed (PNG, JPG, WEBP)')
+                return
+            }
 
             // Preview
             const reader = new FileReader()
@@ -56,7 +84,16 @@ export default function UploadZone({ onSuccess }) {
                 setResult(res.data.screenshot)
                 onSuccess?.(res.data)
             } catch (err) {
-                toast.error(err.response?.data?.message || 'Upload failed')
+                // Handle 402 (limit reached) or 403 (pro feature)
+                if (err.response?.status === 402) {
+                    setUpgradeTrigger('limit_reached')
+                    setShowUpgradeModal(true)
+                } else if (err.response?.status === 403) {
+                    setUpgradeTrigger('pro_feature')
+                    setShowUpgradeModal(true)
+                } else {
+                    toast.error(err.response?.data?.message || 'Upload failed')
+                }
                 setPreview(null)
             } finally {
                 setUploading(false)
@@ -68,10 +105,10 @@ export default function UploadZone({ onSuccess }) {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
-        maxSize: 20 * 1024 * 1024,
+        accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
+        maxSize: 10 * 1024 * 1024, // 10MB
         multiple: false,
-        disabled: uploading,
+        disabled: uploading || limitReached,
     })
 
     const reset = () => {
@@ -84,6 +121,22 @@ export default function UploadZone({ onSuccess }) {
 
     return (
         <div className="upload-section">
+            {/* Usage Badge */}
+            {isFreeTier && (
+                <div className={getUsageBadgeClass()}>
+                    {limitReached ? (
+                        <span>❌ Limit Reached: {screenshotCount} / {limit} screenshots used</span>
+                    ) : (
+                        <span>📊 {screenshotCount} / {limit} screenshots used this month</span>
+                    )}
+                </div>
+            )}
+            {tier === 'pro' && (
+                <div className="usage-badge pro">
+                    ✨ PRO: Unlimited uploads
+                </div>
+            )}
+
             <AnimatePresence mode="wait">
                 {!result ? (
                     <motion.div
@@ -92,44 +145,67 @@ export default function UploadZone({ onSuccess }) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                     >
-                        <div
-                            {...getRootProps()}
-                            className={`dropzone ${isDragActive ? 'drag-active' : ''} ${uploading ? 'uploading' : ''}`}
-                            id="upload-dropzone"
-                        >
-                            <input {...getInputProps()} id="screenshot-file-input" />
-                            {preview && !uploading && (
-                                <img src={preview} alt="preview" className="drop-preview" />
-                            )}
-                            {!preview && (
-                                <>
-                                    <div className="drop-icon">
-                                        {isDragActive ? '⬇️' : '📤'}
+                        {limitReached ? (
+                            // Paywall State
+                            <div className="paywall-state">
+                                <Sparkles size={64} className="paywall-icon" />
+                                <h3>Monthly Limit Reached</h3>
+                                <p>
+                                    You've used all {limit} free screenshots this month.
+                                    Upgrade to Pro for unlimited uploads!
+                                </p>
+                                <button
+                                    className="upgrade-cta-btn"
+                                    onClick={() => {
+                                        setUpgradeTrigger('limit_reached')
+                                        setShowUpgradeModal(true)
+                                    }}
+                                >
+                                    <Sparkles size={20} />
+                                    Upgrade to Pro — ₹399/mo
+                                </button>
+                            </div>
+                        ) : (
+                            // Normal Upload Zone
+                            <div
+                                {...getRootProps()}
+                                className={`dropzone ${isDragActive ? 'drag-active' : ''} ${uploading ? 'uploading' : ''}`}
+                                id="upload-dropzone"
+                            >
+                                <input {...getInputProps()} id="screenshot-file-input" />
+                                {preview && !uploading && (
+                                    <img src={preview} alt="preview" className="drop-preview" />
+                                )}
+                                {!preview && (
+                                    <>
+                                        <div className="drop-icon">
+                                            {isDragActive ? '⬇️' : '📤'}
+                                        </div>
+                                        <p className="drop-title">
+                                            {isDragActive ? 'Drop it!' : 'Drop a screenshot here'}
+                                        </p>
+                                        <p className="drop-sub">or click to browse · PNG, JPG, WEBP up to 10MB</p>
+                                    </>
+                                )}
+                                {uploading && (
+                                    <div className="upload-progress-wrap">
+                                        <div className="upload-steps">
+                                            <div className={`step ${progress >= 10 ? 'done' : ''}`}>📤 Uploading</div>
+                                            <div className={`step ${progress >= 30 ? 'done' : ''}`}>🤖 AI Classifying</div>
+                                            <div className={`step ${progress >= 70 ? 'done' : ''}`}>☁️ Saving to Drive</div>
+                                            <div className={`step ${progress >= 90 ? 'done' : ''}`}>📊 Logging to Sheets</div>
+                                        </div>
+                                        <div className="progress-bar">
+                                            <motion.div
+                                                className="progress-fill"
+                                                animate={{ width: `${progress}%` }}
+                                                transition={{ duration: 0.4 }}
+                                            />
+                                        </div>
                                     </div>
-                                    <p className="drop-title">
-                                        {isDragActive ? 'Drop it!' : 'Drop a screenshot here'}
-                                    </p>
-                                    <p className="drop-sub">or click to browse · PNG, JPG, WEBP up to 20MB</p>
-                                </>
-                            )}
-                            {uploading && (
-                                <div className="upload-progress-wrap">
-                                    <div className="upload-steps">
-                                        <div className={`step ${progress >= 10 ? 'done' : ''}`}>📤 Uploading</div>
-                                        <div className={`step ${progress >= 30 ? 'done' : ''}`}>🤖 AI Classifying</div>
-                                        <div className={`step ${progress >= 70 ? 'done' : ''}`}>☁️ Saving to Drive</div>
-                                        <div className={`step ${progress >= 90 ? 'done' : ''}`}>📊 Logging to Sheets</div>
-                                    </div>
-                                    <div className="progress-bar">
-                                        <motion.div
-                                            className="progress-fill"
-                                            animate={{ width: `${progress}%` }}
-                                            transition={{ duration: 0.4 }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
                     </motion.div>
                 ) : (
                     <motion.div
@@ -169,6 +245,13 @@ export default function UploadZone({ onSuccess }) {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Upgrade Modal */}
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                trigger={upgradeTrigger}
+            />
         </div>
     )
 }

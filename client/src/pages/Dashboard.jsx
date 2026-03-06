@@ -28,16 +28,27 @@ export default function Dashboard() {
     const [stats, setStats] = useState({ total: 0, byCategory: [] })
     const [recent, setRecent] = useState([])
     const [loading, setLoading] = useState(true)
+    const [billingStatus, setBillingStatus] = useState({
+        tier: 'free',
+        screenshotCount: 0,
+        limit: 10,
+    })
     const mergeInProgress = useRef(false)
 
     const fetchData = async () => {
         try {
-            const [statsRes, screenshotsRes] = await Promise.all([
+            const [statsRes, screenshotsRes, billingRes] = await Promise.all([
                 axios.get('/api/screenshots/stats'),
                 axios.get('/api/screenshots?limit=6'),
+                axios.get('/api/billing/status'),
             ])
             setStats(statsRes.data)
             setRecent(screenshotsRes.data.data || [])
+            setBillingStatus({
+                tier: billingRes.data.tier || 'free',
+                screenshotCount: billingRes.data.screenshotCount || 0,
+                limit: billingRes.data.limit || 10,
+            })
         } catch (err) {
             toast.error('Failed to load data')
         } finally {
@@ -84,6 +95,18 @@ export default function Dashboard() {
     useEffect(() => {
         mergeAnonymousSession()
         fetchData()
+        
+        // Check if redirected from successful payment
+        const urlParams = new URLSearchParams(window.location.search)
+        if (urlParams.get('upgraded') === 'true') {
+            toast.success('🎉 Payment successful! Checking your Pro status...', { duration: 3000 })
+            // Clear the URL parameter
+            window.history.replaceState({}, '', '/dashboard')
+            // Refresh data to get updated tier
+            setTimeout(() => {
+                fetchData()
+            }, 2000)
+        }
     }, [])
 
     const handleUploadSuccess = (result) => {
@@ -99,6 +122,9 @@ export default function Dashboard() {
                 <div>
                     <h1 className="dashboard-title">
                         Hey, <span className="gradient-text">{user?.name?.split(' ')[0]}</span> 👋
+                        {billingStatus.tier === 'pro' && (
+                            <span className="pro-badge">✨ PRO</span>
+                        )}
                     </h1>
                     <p className="dashboard-subtitle">
                         {stats.total} screenshots organized across {stats.byCategory.length} categories
@@ -114,7 +140,12 @@ export default function Dashboard() {
 
             {/* Upload Zone */}
             <section className="section">
-                <UploadZone onSuccess={handleUploadSuccess} />
+                <UploadZone 
+                    onSuccess={handleUploadSuccess}
+                    screenshotCount={billingStatus.screenshotCount}
+                    limit={billingStatus.limit}
+                    tier={billingStatus.tier}
+                />
             </section>
 
             {/* Category Grid */}

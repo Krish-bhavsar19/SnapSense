@@ -9,6 +9,9 @@ const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const screenshotRoutes = require('./routes/screenshots');
+const billingRoutes = require('./routes/billing');
+const webhookRoutes = require('./routes/webhook');
+const { initializeLemonSqueezy } = require('./config/lemonsqueezy');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +28,10 @@ app.use(
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 );
+
+// CRITICAL: Raw body parser for Lemon Squeezy webhooks (BEFORE express.json())
+app.use('/api/webhook/lemonsqueezy', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
@@ -76,9 +83,14 @@ const connectDB = async () => {
     app.use(passport.initialize());
     app.use(passport.session());
 
+    // Initialize Lemon Squeezy SDK
+    initializeLemonSqueezy();
+
     // Routes
     app.use('/auth', authRoutes);
     app.use('/api/screenshots', screenshotRoutes);
+    app.use('/api/billing', billingRoutes);
+    app.use('/api/webhook', webhookRoutes);
 
     // ─── Production Frontend Serving ──────────────────────────────────────────
     if (process.env.NODE_ENV === 'production') {
