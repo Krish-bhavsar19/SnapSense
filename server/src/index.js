@@ -13,7 +13,11 @@ const screenshotRoutes = require('./routes/screenshots');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Required for Render/Heroku/AWS when using secure cookies
+app.set('trust proxy', 1);
+
 // ─── Core Middleware (applied before DB connects) ─────────────────────────────
+
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
@@ -61,8 +65,9 @@ const connectDB = async () => {
           secure: process.env.NODE_ENV === 'production',
           httpOnly: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          sameSite: 'lax',
         },
+
       })
     );
 
