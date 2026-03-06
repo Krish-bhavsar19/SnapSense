@@ -26,14 +26,17 @@ const userSchema = new mongoose.Schema(
         countResetAt: { type: Date, default: null },
         totalUploads: { type: Number, default: 0 }, // Keeping this as it's used in current /upload route
 
-        // Subscription Details (For Future Billing implementation)
+        // Subscription Details (Lemon Squeezy Integration)
         subscription: {
-            razorpaySubId: String,
+            lsOrderId: String,
+            lsSubscriptionId: String,
             status: {
                 type: String,
-                enum: ['active', 'halted', 'cancelled'],
+                enum: ['none', 'active', 'payment_failed', 'cancelled', 'expired'],
+                default: 'none',
             },
             currentPeriodEnd: Date,
+            cancelledAt: Date,
         },
     },
     { timestamps: true }

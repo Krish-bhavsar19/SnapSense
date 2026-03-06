@@ -1,0 +1,59 @@
+/**
+ * Middleware to require PRO tier for specific features
+ */
+const requirePro = (req, res, next) => {
+    if (req.user && req.user.tier === 'pro') {
+        return next();
+    }
+
+    return res.status(403).json({
+        error: 'PRO_REQUIRED',
+        feature: req.body.destination || 'This feature',
+        message: 'This feature requires SnapSense Pro. Please upgrade to continue.',
+    });
+};
+
+/**
+ * Middleware to check upload limits for free tier users
+ * Free tier: 10 screenshots/month, auto-resets every 30 days
+ */
+const checkUploadLimit = async (req, res, next) => {
+    const user = req.user;
+
+    // PRO users have unlimited uploads
+    if (user.tier === 'pro') {
+        return next();
+    }
+
+    // Free tier logic
+    const now = new Date();
+
+    // Initialize countResetAt on first upload
+    if (!user.countResetAt) {
+        user.countResetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+        await user.save();
+    }
+
+    // Check if reset period has passed
+    if (now > user.countResetAt) {
+        user.screenshotCount = 0;
+        user.countResetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        await user.save();
+    }
+
+    // Check if limit reached
+    if (user.screenshotCount >= 10) {
+        return res.status(402).json({
+            error: 'LIMIT_REACHED',
+            used: user.screenshotCount,
+            limit: 10,
+            upgradeUrl: '/upgrade',
+            message: 'You have reached your monthly limit of 10 screenshots. Upgrade to Pro for unlimited uploads.',
+        });
+    }
+
+    // Allow upload - count will be incremented in the upload route
+    next();
+};
+
+module.exports = { requirePro, checkUploadLimit };
