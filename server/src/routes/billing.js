@@ -72,7 +72,7 @@ router.post('/checkout', requireAuth, async (req, res) => {
 router.get('/status', requireAuth, async (req, res) => {
     try {
         const user = req.user;
-        
+
         res.json({
             success: true,
             tier: user.tier,
@@ -98,18 +98,38 @@ router.get('/status', requireAuth, async (req, res) => {
 router.post('/verify-upgrade', requireAuth, async (req, res) => {
     try {
         const user = req.user;
-        
+
+        const orderId = 'hackathon-test-order-' + Date.now();
+        const subId = 'hackathon-test-sub-' + Date.now();
+
         // Upgrade the user to PRO directly
         user.tier = 'pro';
         user.subscription = {
-            lsOrderId: 'hackathon-test-order-' + Date.now(),
-            lsSubscriptionId: 'hackathon-test-sub-' + Date.now(),
+            lsOrderId: orderId,
+            lsSubscriptionId: subId,
             status: 'active',
             currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         };
-        
+
         await user.save();
-        
+
+        // Also create a mock Payment record for the local test
+        await Payment.create({
+            userId: user._id,
+            lsOrderId: orderId,
+            lsSubscriptionId: subId,
+            amount: 399, // ₹399
+            currency: 'INR',
+            status: 'paid',
+            webhookEvents: [{
+                eventName: 'verify_upgrade_mock',
+                receivedAt: new Date(),
+                lsEventId: 'mock-event-' + Date.now(),
+                payload: { note: 'Manual upgrade via verify-upgrade route' }
+            }],
+            idempotencyKeys: ['mock-event-' + Date.now()],
+        });
+
         res.json({
             success: true,
             tier: user.tier,

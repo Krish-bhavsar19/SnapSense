@@ -13,7 +13,7 @@ const actionSchema = new mongoose.Schema(
         // Store image data temporarily until logged in and uploaded to Drive
         imageBuffer: { type: Buffer },
 
-        
+        fileHash: { type: String, required: true },
         // AI Classification
         category: {
             type: String,

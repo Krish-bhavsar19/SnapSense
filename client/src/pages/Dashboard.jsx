@@ -34,11 +34,11 @@ export default function Dashboard() {
         screenshotCount: 0,
         limit: 10,
     })
-    
+
     // Upgrade Modal State
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeTrigger, setUpgradeTrigger] = useState('manual')
-    
+
     const mergeInProgress = useRef(false)
 
     const fetchData = async () => {
@@ -66,7 +66,7 @@ export default function Dashboard() {
     const mergeAnonymousSession = async () => {
         const sessionId = localStorage.getItem('snap_session_id')
         const pendingCards = JSON.parse(localStorage.getItem('snap_pending_cards') || '[]')
-        
+
         if (!sessionId || pendingCards.length === 0) {
             localStorage.removeItem('snap_session_id')
             localStorage.removeItem('snap_pending_cards')
@@ -77,11 +77,11 @@ export default function Dashboard() {
         mergeInProgress.current = true
 
         try {
-            const res = await axios.post('/auth/merge', { 
+            const res = await axios.post('/auth/merge', {
                 sessionId,
                 pendingCards // Sending the cards stored in localStorage as requested
             })
-            
+
             if (res.data.success && res.data.merged > 0) {
                 toast.success(
                     `🎉 Saved ${res.data.merged} screenshot${res.data.merged > 1 ? 's' : ''} from your preview session!`,
@@ -114,14 +114,14 @@ export default function Dashboard() {
     useEffect(() => {
         mergeAnonymousSession()
         fetchData()
-        
+
         // Check if redirected from successful payment
         const urlParams = new URLSearchParams(window.location.search)
         if (urlParams.get('upgraded') === 'true') {
             toast.success('🎉 Payment successful! Setting up your Pro account...', { duration: 3000 })
             // Clear the URL parameter
             window.history.replaceState({}, '', '/dashboard')
-            
+
             // Because local webhooks won't trigger, manually trigger an upgrade verification
             axios.post('/api/billing/verify-upgrade')
                 .then(() => {
@@ -179,7 +179,7 @@ export default function Dashboard() {
 
             {/* Upload Zone */}
             <section className="section">
-                <UploadZone 
+                <UploadZone
                     onSuccess={handleUploadSuccess}
                     screenshotCount={billingStatus.screenshotCount}
                     limit={billingStatus.limit}
@@ -253,6 +253,21 @@ export default function Dashboard() {
                                                         📅 Calendar
                                                     </a>
                                                 )}
+                                                {sc.metadata?.mapLink && (
+                                                    <a href={sc.metadata.mapLink} target="_blank" rel="noreferrer" className="action-link map">
+                                                        📍 Map
+                                                    </a>
+                                                )}
+                                                {sc.sheetsRowNumber && user?.sheetsId && (
+                                                    <a href={`https://docs.google.com/spreadsheets/d/${user.sheetsId}`} target="_blank" rel="noreferrer" className="action-link sheet">
+                                                        📊 Sheets
+                                                    </a>
+                                                )}
+                                                {sc.taskLink && (
+                                                    <a href={sc.taskLink} target="_blank" rel="noreferrer" className="action-link task">
+                                                        ✅ Task
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
                                     </motion.div>
@@ -271,7 +286,7 @@ export default function Dashboard() {
                     <p>Drop your first screenshot above to get started!</p>
                 </div>
             )}
-            
+
             {/* Upgrade Modal for Merge Interruption */}
             <UpgradeModal
                 isOpen={showUpgradeModal}

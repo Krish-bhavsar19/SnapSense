@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useAuth } from '../context/AuthContext'
 
 const CATEGORY_META = {
     'Ticket': { icon: '🎫', color: '#f59e0b' },
@@ -21,6 +22,7 @@ const CATEGORY_META = {
 }
 
 export default function CategoryView() {
+    const { user } = useAuth()
     const { categoryName } = useParams()
     const category = decodeURIComponent(categoryName)
     const meta = CATEGORY_META[category] || CATEGORY_META['Other']
@@ -127,6 +129,21 @@ export default function CategoryView() {
                                     {sc.calendarEventLink && (
                                         <a href={sc.calendarEventLink} target="_blank" rel="noreferrer" className="action-link calendar">
                                             📅 Calendar Event
+                                        </a>
+                                    )}
+                                    {sc.metadata?.mapLink && (
+                                        <a href={sc.metadata.mapLink} target="_blank" rel="noreferrer" className="action-link map">
+                                            📍 Map
+                                        </a>
+                                    )}
+                                    {sc.sheetsRowNumber && user?.sheetsId && (
+                                        <a href={`https://docs.google.com/spreadsheets/d/${user.sheetsId}`} target="_blank" rel="noreferrer" className="action-link sheet">
+                                            📊 Sheets
+                                        </a>
+                                    )}
+                                    {sc.taskLink && (
+                                        <a href={sc.taskLink} target="_blank" rel="noreferrer" className="action-link task">
+                                            ✅ Task
                                         </a>
                                     )}
                                 </div>

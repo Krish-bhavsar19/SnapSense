@@ -114,13 +114,14 @@ export default function Landing() {
             toast.success('AI classified your screenshot!')
 
         } catch (err) {
-            if (err.response?.data?.limitReached) {
+            if (err.response?.status === 409) {
+                toast.error(err.response?.data?.message || 'Screenshot already uploaded in this session.')
+            } else if (err.response?.data?.limitReached) {
                 setLimitReached(true)
-                setPreview(null)
             } else {
                 toast.error(err.response?.data?.message || 'Upload failed')
-                setPreview(null)
             }
+            setPreview(null)
         } finally {
             setUploading(false)
             setTimeout(() => setProgress(0), 800)

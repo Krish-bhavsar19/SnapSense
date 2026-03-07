@@ -9,6 +9,7 @@ const screenshotSchema = new mongoose.Schema(
         },
         originalName: { type: String, default: 'screenshot.png' },
         mimeType: { type: String, default: 'image/png' },
+        fileHash: { type: String, required: true },
 
         // Classification
         category: {

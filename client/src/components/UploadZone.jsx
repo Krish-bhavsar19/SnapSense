@@ -5,6 +5,7 @@ import { Sparkles } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import UpgradeModal from './UpgradeModal'
+import { useAuth } from '../context/AuthContext'
 
 const CATEGORY_META = {
     'Ticket': { icon: '🎫', color: '#f59e0b' },
@@ -23,6 +24,7 @@ const CATEGORY_META = {
 }
 
 export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10, tier = 'free' }) {
+    const { user } = useAuth()
     const [uploading, setUploading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [results, setResults] = useState([])
@@ -98,7 +100,7 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                 const file = validFiles[i]
                 const baseProgress = 10 + (i * (90 / totalFiles))
                 const fileProgressShare = 90 / totalFiles
-                
+
                 const formData = new FormData()
                 formData.append('screenshot', file)
 
@@ -122,6 +124,8 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                         setUpgradeTrigger('pro_feature')
                         setShowUpgradeModal(true)
                         break
+                    } else if (err.response?.status === 409) {
+                        toast.error(err.response?.data?.message || `Duplicate screenshot detected for ${file.name}`)
                     } else {
                         toast.error(err.response?.data?.message || `Upload failed for ${file.name}`)
                     }
@@ -131,6 +135,9 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
             setProgress(100)
             setResults(newResults)
             setUploading(false)
+            if (newResults.length === 0) {
+                setPreviews([])
+            }
             setTimeout(() => setProgress(0), 1000)
         },
         [onSuccess]
@@ -275,6 +282,21 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                                             {res.calendarEventLink && (
                                                 <a href={res.calendarEventLink} target="_blank" rel="noreferrer" className="result-action-btn calendar">
                                                     📅 Calendar Event Created
+                                                </a>
+                                            )}
+                                            {res.metadata?.mapLink && (
+                                                <a href={res.metadata.mapLink} target="_blank" rel="noreferrer" className="result-action-btn map">
+                                                    📍 View Map
+                                                </a>
+                                            )}
+                                            {res.sheetsRowNumber && user?.sheetsId && (
+                                                <a href={`https://docs.google.com/spreadsheets/d/${user.sheetsId}`} target="_blank" rel="noreferrer" className="result-action-btn sheet">
+                                                    📊 View in Sheets
+                                                </a>
+                                            )}
+                                            {res.taskLink && (
+                                                <a href={res.taskLink} target="_blank" rel="noreferrer" className="result-action-btn task">
+                                                    ✅ View Task
                                                 </a>
                                             )}
                                         </div>

@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const crypto = require('crypto');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { checkUploadLimit } = require('../middleware/tierCheck');
@@ -134,6 +135,17 @@ router.post(
             const { buffer, mimetype, originalname } = req.file;
             const filename = `${Date.now()}-${originalname}`;
 
+            // Check for duplicate file hash
+            const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
+            const existingScreenshot = await Screenshot.findOne({ userId: user._id, fileHash });
+            
+            if (existingScreenshot) {
+                return res.status(409).json({ 
+                    success: false, 
+                    message: `You have already uploaded this screenshot. It was categorized as "${existingScreenshot.category}".` 
+                });
+            }
+
             // Step 1: Classify with Groq AI
             console.log('🤖 Classifying screenshot...');
             const aiResult = await classifyScreenshot(buffer, mimetype);
@@ -148,6 +160,7 @@ router.post(
                 userId: user._id,
                 originalName: originalname,
                 mimeType: mimetype,
+                fileHash,
                 category: aiResult.category,
                 metadata: {
                     summary: aiResult.summary,
@@ -221,6 +234,17 @@ router.post(
 
             const { buffer, mimetype, originalname } = req.file;
 
+            // Check for duplicate anonymous file hash
+            const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
+            const existingAction = await Action.findOne({ sessionId, fileHash });
+
+            if (existingAction) {
+                return res.status(409).json({
+                    success: false,
+                    message: `You have already uploaded this screenshot during this session (Classified as: ${existingAction.category}).`
+                });
+            }
+
             // Ensure AnonymousSession exists (upsert)
             await AnonymousSession.findOneAndUpdate(
                 { sessionId },
@@ -249,6 +273,7 @@ router.post(
                 sessionId,
                 originalName: originalname,
                 mimeType: mimetype,
+                fileHash,
                 imageBuffer: buffer,
                 category: aiResult.category,
                 metadata: {
