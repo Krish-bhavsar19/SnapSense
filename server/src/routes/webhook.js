@@ -116,15 +116,33 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
                 break;
             }
 
-            // Upgrade user to PRO
-            user.tier = 'pro';
-            user.subscription = {
-                lsOrderId: eventData.id,
-                status: 'active',
-                currentPeriodEnd: new Date(attributes.created_at),
-            };
+            // Get months from custom data (default to 1 if not specified)
+            const months = parseInt(event.meta?.custom_data?.months) || 1;
+            console.log(`📅 Processing ${months}-month subscription`);
+
+            // Check if user already has an active subscription (prevent double payment)
+            if (user.subscription?.status === 'active' && user.subscription?.currentPeriodEnd > new Date()) {
+                console.log(`⚠️  User ${userId} already has active subscription, extending instead`);
+                // Extend existing subscription by the purchased months
+                const currentEnd = new Date(user.subscription.currentPeriodEnd);
+                const daysToAdd = months * 30;
+                user.subscription.currentPeriodEnd = new Date(currentEnd.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+            } else {
+                // Calculate proper expiry date based on purchased months
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + (months * 30));
+                
+                // Upgrade user to PRO
+                user.tier = 'pro';
+                user.subscription = {
+                    lsOrderId: eventData.id,
+                    status: 'active',
+                    currentPeriodEnd: expiryDate,
+                };
+            }
+            
             await user.save();
-            console.log(`✅ User ${userId} upgraded to PRO`);
+            console.log(`✅ User ${userId} upgraded to PRO (expires: ${user.subscription.currentPeriodEnd})`);
 
             // Create/update Payment record
             await Payment.findOneAndUpdate(

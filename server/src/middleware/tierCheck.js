@@ -1,4 +1,36 @@
 /**
+ * Middleware to check if subscription has expired and downgrade user
+ * Should be applied after authentication middleware
+ */
+const checkSubscriptionExpiry = async (req, res, next) => {
+    if (!req.user) {
+        return next();
+    }
+
+    const user = req.user;
+    
+    // Check if user has PRO tier with subscription
+    if (user.tier === 'pro' && user.subscription) {
+        const now = new Date();
+        const periodEnd = new Date(user.subscription.currentPeriodEnd);
+        
+        // If subscription has expired and status is not already expired
+        if (periodEnd < now && user.subscription.status !== 'expired') {
+            console.log(`⏰ Subscription expired for user ${user._id}, downgrading to free`);
+            
+            user.tier = 'free';
+            user.subscription.status = 'expired';
+            await user.save();
+            
+            // Update req.user to reflect the change
+            req.user = user;
+        }
+    }
+    
+    next();
+};
+
+/**
  * Middleware to require PRO tier for specific features
  */
 const requirePro = (req, res, next) => {
@@ -56,4 +88,4 @@ const checkUploadLimit = async (req, res, next) => {
     next();
 };
 
-module.exports = { requirePro, checkUploadLimit };
+module.exports = { requirePro, checkUploadLimit, checkSubscriptionExpiry };
