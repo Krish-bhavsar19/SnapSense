@@ -7,9 +7,10 @@ const {
 /**
  * Create a checkout session for a user to upgrade to PRO
  * @param {Object} user - Mongoose user document
+ * @param {Number} months - Subscription duration in months (1, 3, 6, or 12)
  * @returns {Promise<string>} - Checkout URL
  */
-async function createCheckoutSession(user) {
+async function createCheckoutSession(user, months = 1) {
     const storeId = process.env.LEMONSQUEEZY_STORE_ID;
     const variantId = process.env.LEMONSQUEEZY_VARIANT_ID;
 
@@ -17,6 +18,19 @@ async function createCheckoutSession(user) {
         throw new Error('Lemon Squeezy store or variant ID not configured');
     }
 
+    // Calculate pricing with discounts
+    // Base price: ₹349/month
+    const basePricePerMonth = 349;
+    const discounts = {
+        1: 0,      // No discount
+        3: 10,     // 10% discount
+        6: 15,     // 15% discount
+        12: 20,    // 20% discount
+    };
+    
+    const discount = discounts[months] || 0;
+    const totalPrice = Math.round(basePricePerMonth * months * (1 - discount / 100));
+    
     try {
         const checkout = await createCheckout(storeId, variantId, {
             checkoutOptions: {
@@ -29,13 +43,18 @@ async function createCheckoutSession(user) {
                 name: user.name,
                 custom: {
                     user_id: user._id.toString(),
+                    months: months,
+                    discount_applied: discount,
                 },
+                discount: discount > 0,
             },
             expiresAt: null,
             preview: true, // Set to false in production
             testMode: true, // Set to false in production
             productOptions: {
-                redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true`,
+                name: `SnapSense Pro - ${months} Month${months > 1 ? 's' : ''}${discount > 0 ? ` (${discount}% OFF)` : ''}`,
+                description: `${months} month${months > 1 ? 's' : ''} of unlimited screenshot storage and AI-powered organization`,
+                redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true&months=${months}`,
             }
         });
 

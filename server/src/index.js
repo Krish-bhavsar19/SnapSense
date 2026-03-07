@@ -12,6 +12,7 @@ const screenshotRoutes = require('./routes/screenshots');
 const billingRoutes = require('./routes/billing');
 const webhookRoutes = require('./routes/webhook');
 const { initializeLemonSqueezy } = require('./config/lemonsqueezy');
+const { checkSubscriptionExpiry } = require('./middleware/tierCheck');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -82,6 +83,9 @@ const connectDB = async () => {
     require('./config/passport');
     app.use(passport.initialize());
     app.use(passport.session());
+
+    // Check subscription expiry on all authenticated requests
+    app.use(checkSubscriptionExpiry);
 
     // Initialize Lemon Squeezy SDK
     initializeLemonSqueezy();
