@@ -106,7 +106,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
     switch (eventName) {
         case 'order_created':
             console.log(`💰 Processing order_created for user ${userId}`);
-            
+
             if (!userId) {
                 console.error('❌ No user_id in order_created event');
                 break;
@@ -133,7 +133,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
                 // Calculate proper expiry date based on purchased months
                 const expiryDate = new Date();
                 expiryDate.setDate(expiryDate.getDate() + (months * 30));
-                
+
                 // Upgrade user to PRO
                 user.tier = 'pro';
                 user.subscription = {
@@ -142,7 +142,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
                     currentPeriodEnd: expiryDate,
                 };
             }
-            
+
             await user.save();
             console.log(`✅ User ${userId} upgraded to PRO (expires: ${user.subscription.currentPeriodEnd})`);
 
@@ -171,7 +171,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_created':
             console.log(`📋 Processing subscription_created for user ${userId}`);
-            
+
             if (!userId) break;
 
             const subUser = await User.findById(userId);
@@ -201,7 +201,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_updated':
             console.log(`🔄 Processing subscription_updated: ${eventData.id}`);
-            
+
             const updatedSub = await User.findOne({
                 'subscription.lsSubscriptionId': eventData.id,
             });
@@ -218,7 +218,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_payment_success':
             console.log(`✅ Processing subscription_payment_success for user ${userId}`);
-            
+
             const renewUser = await User.findOne({
                 'subscription.lsSubscriptionId': eventData.id,
             });
@@ -236,7 +236,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_payment_failed':
             console.error(`❌ Processing subscription_payment_failed for subscription ${eventData.id}`);
-            
+
             const failedUser = await User.findOne({
                 'subscription.lsSubscriptionId': eventData.id,
             });
@@ -253,7 +253,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_cancelled':
             console.log(`🛑 Processing subscription_cancelled: ${eventData.id}`);
-            
+
             // Grace period logic: User stays PRO until currentPeriodEnd
             // Do NOT downgrade tier immediately
             const cancelledUser = await User.findOne({
@@ -272,7 +272,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_resumed':
             console.log(`▶️  Processing subscription_resumed: ${eventData.id}`);
-            
+
             const resumedUser = await User.findOne({
                 'subscription.lsSubscriptionId': eventData.id,
             });
@@ -291,7 +291,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'subscription_expired':
             console.log(`⏰ Processing subscription_expired: ${eventData.id}`);
-            
+
             const expiredUser = await User.findOne({
                 'subscription.lsSubscriptionId': eventData.id,
             });
@@ -308,7 +308,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
 
         case 'order_refunded':
             console.log(`💸 Processing order_refunded for order ${eventData.id}`);
-            
+
             // Find user by order ID
             const refundedUser = await User.findOne({
                 'subscription.lsOrderId': eventData.id,
@@ -350,7 +350,7 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
  */
 async function recordEventInPayment(lsSubscriptionId, eventName, eventId, event) {
     const payment = await Payment.findOne({ lsSubscriptionId });
-    
+
     if (payment) {
         payment.webhookEvents.push({
             eventName,
@@ -371,7 +371,7 @@ async function recordEventInPayment(lsSubscriptionId, eventName, eventId, event)
 router.post('/test-upgrade', async (req, res) => {
     try {
         const { userId } = req.body;
-        
+
         if (!userId) {
             return res.status(400).json({ error: 'userId required' });
         }
