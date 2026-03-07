@@ -62,7 +62,7 @@ const connectDB = async () => {
     // Session store (requires MongoDB)
     app.use(
       session({
-        secret: process.env.SESSION_SECRET || 'snapsense-secret',
+        secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         store: MongoStore.create({
