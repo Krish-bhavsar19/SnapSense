@@ -35,7 +35,6 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
     const isFreeTier = tier === 'free'
     const limitReached = isFreeTier && screenshotCount >= limit
 
-    // Usage badge color logic
     const getUsageBadgeClass = () => {
         if (tier === 'pro') return 'usage-badge pro'
         if (screenshotCount >= 10) return 'usage-badge danger'
@@ -48,7 +47,7 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
             f.errors?.some(e => e.code === 'too-many-files')
         )
         if (hasTooMany) {
-            toast.error('You can only upload up to 3 photos at a time. Please try again with 3 or fewer files.', { duration: 4000 })
+            toast.error('You can only upload up to 3 photos at a time.', { duration: 4000 })
         }
     }, [])
 
@@ -56,22 +55,20 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
         async (acceptedFiles) => {
             if (!acceptedFiles || acceptedFiles.length === 0) return
 
-            // Warn and cap if more than 3 somehow pass through
             if (acceptedFiles.length > 3) {
-                toast.error('Only the first 3 photos will be uploaded. Please select up to 3 at a time.')
+                toast.error('Only the first 3 photos will be uploaded.')
             }
             const filesToUpload = acceptedFiles.slice(0, 3)
 
-            // File validation check
-            const maxSize = 10 * 1024 * 1024 // 10MB
+            const maxSize = 10 * 1024 * 1024
             const validFiles = []
             for (const file of filesToUpload) {
                 if (file.size > maxSize) {
-                    toast.error(`File ${file.name} is too large. Maximum size is 10MB.`)
+                    toast.error(`${file.name} is too large (max 10MB).`)
                     continue
                 }
                 if (!file.type.startsWith('image/')) {
-                    toast.error(`File ${file.name} is not an image (PNG, JPG, WEBP)`)
+                    toast.error(`${file.name} is not an image.`)
                     continue
                 }
                 validFiles.push(file)
@@ -79,7 +76,6 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
 
             if (validFiles.length === 0) return
 
-            // Generate Previews
             const newPreviews = await Promise.all(validFiles.map(file => {
                 return new Promise((resolve) => {
                     const reader = new FileReader()
@@ -125,9 +121,9 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                         setShowUpgradeModal(true)
                         break
                     } else if (err.response?.status === 409) {
-                        toast.error(err.response?.data?.message || `Duplicate screenshot detected for ${file.name}`)
+                        toast.error(err.response?.data?.message || `Duplicate: ${file.name}`)
                     } else {
-                        toast.error(err.response?.data?.message || `Upload failed for ${file.name}`)
+                        toast.error(err.response?.data?.message || `Failed: ${file.name}`)
                     }
                 }
             }
@@ -147,7 +143,7 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
         onDrop,
         onDropRejected,
         accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
-        maxSize: 10 * 1024 * 1024, // 10MB
+        maxSize: 10 * 1024 * 1024,
         multiple: true,
         maxFiles: 3,
         disabled: uploading || limitReached,
@@ -165,16 +161,14 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
             {isFreeTier && (
                 <div className={getUsageBadgeClass()}>
                     {limitReached ? (
-                        <span>❌ Limit Reached: {screenshotCount} / {limit} screenshots used</span>
+                        <span>❌ {screenshotCount}/{limit} used</span>
                     ) : (
-                        <span>📊 {screenshotCount} / {limit} screenshots used this month</span>
+                        <span>📊 {screenshotCount}/{limit} used</span>
                     )}
                 </div>
             )}
             {tier === 'pro' && (
-                <div className="usage-badge pro">
-                    ✨ PRO: Unlimited uploads
-                </div>
+                <div className="usage-badge pro">✨ PRO: Unlimited</div>
             )}
 
             <AnimatePresence mode="wait">
@@ -186,14 +180,10 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                         exit={{ opacity: 0 }}
                     >
                         {limitReached ? (
-                            // Paywall State
                             <div className="paywall-state">
-                                <Sparkles size={64} className="paywall-icon" />
-                                <h3>Monthly Limit Reached</h3>
-                                <p>
-                                    You've used all {limit} free screenshots this month.
-                                    Upgrade to Pro for unlimited uploads!
-                                </p>
+                                <Sparkles size={48} className="paywall-icon" />
+                                <h3>Limit Reached</h3>
+                                <p>Upgrade to Pro for unlimited uploads!</p>
                                 <button
                                     className="upgrade-cta-btn"
                                     onClick={() => {
@@ -202,51 +192,51 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                                     }}
                                 >
                                     <Sparkles size={20} />
-                                    Upgrade to Pro — ₹399/mo
+                                    Upgrade to Pro
                                 </button>
                             </div>
                         ) : (
-                            // Normal Upload Zone
                             <div
                                 {...getRootProps()}
                                 className={`dropzone ${isDragActive ? 'drag-active' : ''} ${uploading ? 'uploading' : ''}`}
                                 id="upload-dropzone"
                             >
                                 <input {...getInputProps()} id="screenshot-file-input" />
+
+                                {/* Image Reveal Loading - top to bottom curtain */}
+                                {uploading && previews.length > 0 && (
+                                    <div className="image-reveal-loader">
+                                        <img src={previews[0]} alt="processing" className="reveal-image" />
+                                        <motion.div
+                                            className="reveal-curtain"
+                                            initial={{ height: '100%' }}
+                                            animate={{ height: `${100 - progress}%` }}
+                                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                                        />
+                                        <div className="reveal-status">
+                                            {progress < 30 ? 'Uploading...' : progress < 70 ? 'Analyzing...' : progress < 90 ? 'Saving...' : 'Done'}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {previews.length > 0 && !uploading && (
-                                    <div className="previews-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                    <div className="previews-container">
                                         {previews.map((prev, i) => (
-                                            <img key={i} src={prev} alt={`preview-${i}`} className="drop-preview" style={{ height: '80px', width: 'auto', borderRadius: '8px' }} />
+                                            <img key={i} src={prev} alt={`preview-${i}`} className="drop-preview-thumb" />
                                         ))}
                                     </div>
                                 )}
-                                {previews.length === 0 && (
+
+                                {previews.length === 0 && !uploading && (
                                     <>
-                                        <div className="drop-icon">
-                                            {isDragActive ? '⬇️' : '📤'}
+                                        <div className="drop-icon-wrap">
+                                            <span className="drop-icon-inner">{isDragActive ? '⬇️' : '📤'}</span>
                                         </div>
                                         <p className="drop-title">
-                                            {isDragActive ? 'Drop them!' : 'Drop up to 3 screenshots here'}
+                                            {isDragActive ? 'Drop them!' : 'Drop up to 3 screenshots'}
                                         </p>
-                                        <p className="drop-sub">or click to browse · PNG, JPG, WEBP up to 10MB each</p>
+                                        <p className="drop-sub">PNG, JPG, WEBP up to 10 MB each</p>
                                     </>
-                                )}
-                                {uploading && (
-                                    <div className="upload-progress-wrap">
-                                        <div className="upload-steps">
-                                            <div className={`step ${progress >= 10 ? 'done' : ''}`}>📤 Uploading</div>
-                                            <div className={`step ${progress >= 30 ? 'done' : ''}`}>🤖 AI Classifying</div>
-                                            <div className={`step ${progress >= 70 ? 'done' : ''}`}>☁️ Saving to Drive</div>
-                                            <div className={`step ${progress >= 90 ? 'done' : ''}`}>📊 Logging to Sheets</div>
-                                        </div>
-                                        <div className="progress-bar">
-                                            <motion.div
-                                                className="progress-fill"
-                                                animate={{ width: `${progress}%` }}
-                                                transition={{ duration: 0.4 }}
-                                            />
-                                        </div>
-                                    </div>
                                 )}
                             </div>
                         )}
@@ -259,44 +249,44 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                         exit={{ opacity: 0 }}
                         className="results-wrapper"
                     >
-                        <div className="results-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="results-grid">
                             {results.map((res, i) => {
                                 const meta = CATEGORY_META[res.category] || CATEGORY_META['Other']
                                 return (
-                                    <div key={res._id || i} className="result-card" style={{ '--cat-color': meta.color, margin: 0 }}>
+                                    <div key={res._id || i} className="result-card" style={{ '--cat-color': meta.color }}>
                                         <div className="result-header">
                                             <div className="result-category-badge" style={{ background: meta.color + '22', border: `1px solid ${meta.color}66`, color: meta.color }}>
                                                 {meta.icon} {res.category}
                                             </div>
                                             <div className="result-confidence">
-                                                {Math.round((res.metadata?.confidence || 0) * 100)}% confident
+                                                {Math.round((res.metadata?.confidence || 0) * 100)}%
                                             </div>
                                         </div>
                                         <p className="result-summary">{res.metadata?.summary}</p>
                                         <div className="result-actions">
                                             {res.driveViewLink && (
                                                 <a href={res.driveViewLink} target="_blank" rel="noreferrer" className="result-action-btn drive">
-                                                    📁 View in Drive
+                                                    📁 Drive
                                                 </a>
                                             )}
                                             {res.calendarEventLink && (
                                                 <a href={res.calendarEventLink} target="_blank" rel="noreferrer" className="result-action-btn calendar">
-                                                    📅 Calendar Event Created
+                                                    📅 Calendar
                                                 </a>
                                             )}
                                             {res.metadata?.mapLink && (
                                                 <a href={res.metadata.mapLink} target="_blank" rel="noreferrer" className="result-action-btn map">
-                                                    📍 View Map
+                                                    📍 Map
                                                 </a>
                                             )}
                                             {res.sheetsRowNumber && user?.sheetsId && (
                                                 <a href={`https://docs.google.com/spreadsheets/d/${user.sheetsId}`} target="_blank" rel="noreferrer" className="result-action-btn sheet">
-                                                    📊 View in Sheets
+                                                    📊 Sheets
                                                 </a>
                                             )}
                                             {res.taskLink && (
                                                 <a href={res.taskLink} target="_blank" rel="noreferrer" className="result-action-btn task">
-                                                    ✅ View Task
+                                                    ✅ Task
                                                 </a>
                                             )}
                                         </div>
@@ -311,7 +301,6 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                 )}
             </AnimatePresence>
 
-            {/* Upgrade Modal */}
             <UpgradeModal
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}

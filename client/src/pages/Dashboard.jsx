@@ -30,13 +30,13 @@ export default function Dashboard() {
     const [stats, setStats] = useState({ total: 0, byCategory: [] })
     const [recent, setRecent] = useState([])
     const [loading, setLoading] = useState(true)
+    const [showAllCategories, setShowAllCategories] = useState(false)
     const [billingStatus, setBillingStatus] = useState({
         tier: 'free',
         screenshotCount: 0,
         limit: 10,
     })
 
-    // Upgrade Modal State
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeTrigger, setUpgradeTrigger] = useState('manual')
 
@@ -63,7 +63,6 @@ export default function Dashboard() {
         }
     }
 
-    // Auto-merge any pending anonymous session actions on login
     const mergeAnonymousSession = async () => {
         const sessionId = localStorage.getItem('snap_session_id')
         const pendingCards = JSON.parse(localStorage.getItem('snap_pending_cards') || '[]')
@@ -80,7 +79,7 @@ export default function Dashboard() {
         try {
             const res = await axios.post('/auth/merge', {
                 sessionId,
-                pendingCards // Sending the cards stored in localStorage as requested
+                pendingCards
             })
 
             if (res.data.success && res.data.merged > 0) {
@@ -88,21 +87,17 @@ export default function Dashboard() {
                     `🎉 Saved ${res.data.merged} screenshot${res.data.merged > 1 ? 's' : ''} from your preview session!`,
                     { duration: 6000 }
                 )
-                // Clean up local storage ONLY if successful
                 localStorage.removeItem('snap_session_id')
                 localStorage.removeItem('snap_pending_cards')
                 fetchData()
             }
         } catch (err) {
-            // Check if it's the 402 limit reached error
             if (err.response?.status === 402) {
                 setUpgradeTrigger('limit_reached')
                 setShowUpgradeModal(true)
-                // We deliberately do NOT remove local storage here so they can upgrade and sync later.
                 toast.error(err.response?.data?.message || 'Free tier limit reached for merging', { duration: 5000 })
             } else {
                 console.error('Auto-merge failed (non-critical):', err.message)
-                // Clean up on generic errors so it doesn't get stuck forever
                 localStorage.removeItem('snap_session_id')
                 localStorage.removeItem('snap_pending_cards')
             }
@@ -111,27 +106,23 @@ export default function Dashboard() {
         }
     }
 
-
     useEffect(() => {
         mergeAnonymousSession()
         fetchData()
 
-        // Check if redirected from successful payment
         const urlParams = new URLSearchParams(window.location.search)
         if (urlParams.get('upgraded') === 'true') {
             toast.success('🎉 Payment successful! Setting up your Pro account...', { duration: 3000 })
-            // Clear the URL parameter
             window.history.replaceState({}, '', '/dashboard')
 
-            // Because local webhooks won't trigger, manually trigger an upgrade verification
             axios.post('/api/billing/verify-upgrade')
                 .then(() => {
                     toast.success('Welcome to Pro! Enjoy unlimited uploads! ✨')
-                    fetchUser() // Forces the Navbar user state to sync with 'pro' tier
-                    fetchData() // Syncs local billing status
+                    fetchUser()
+                    fetchData()
                 })
                 .catch(() => {
-                    fetchData() // Fallback check
+                    fetchData()
                 })
         }
     }, [])
@@ -141,6 +132,22 @@ export default function Dashboard() {
         fetchData()
     }
 
+    // Get top 5 categories that have screenshots, sorted by count
+    const categoriesWithData = stats.byCategory
+        .map(s => ({
+            ...s,
+            meta: CATEGORY_META[s.category] || CATEGORY_META['Other']
+        }))
+        .sort((a, b) => b.count - a.count)
+
+    const topCategories = categoriesWithData.slice(0, 5)
+    const restCategories = categoriesWithData.slice(5)
+
+    // All categories (including those with 0 screenshots) for "show more"
+    const allCategories = Object.entries(CATEGORY_META).map(([cat, meta]) => {
+        const found = stats.byCategory.find((s) => s.category === cat)
+        return { category: cat, count: found?.count || 0, meta }
+    }).sort((a, b) => b.count - a.count)
 
     return (
         <div className="dashboard">
@@ -148,19 +155,18 @@ export default function Dashboard() {
             <div className="dashboard-header">
                 <div>
                     <h1 className="dashboard-title">
-                        Hey, <span className="gradient-text">{user?.name?.split(' ')[0]}</span> 👋
+                        Hey, <span className="accent-text">{user?.name?.split(' ')[0]}</span>
                         {billingStatus.tier === 'pro' && (
-                            <span className="pro-badge">✨ PRO</span>
+                            <span className="pro-badge">PRO</span>
                         )}
                     </h1>
                     <p className="dashboard-subtitle">
-                        {stats.total} screenshots organized across {stats.byCategory.length} categories
+                        {stats.total} screenshots · {stats.byCategory.length} categories
                     </p>
                 </div>
                 <div className="dashboard-header-actions">
                     <div className="stat-chip">
-                        <span>📸</span>
-                        <span>{stats.total} Total</span>
+                        <span>{stats.total}</span>
                     </div>
                     {billingStatus.tier === 'free' && (
                         <motion.button
@@ -172,13 +178,12 @@ export default function Dashboard() {
                                 setShowUpgradeModal(true)
                             }}
                         >
-                            ✨ Upgrade to Pro
+                            Upgrade
                         </motion.button>
                     )}
                 </div>
             </div>
 
-            {/* Subscription Status Banner */}
             <SubscriptionBanner />
 
             {/* Upload Zone */}
@@ -191,34 +196,81 @@ export default function Dashboard() {
                 />
             </section>
 
-            {/* Category Grid */}
-            {stats.byCategory.length > 0 && (
+            {/* Top 5 Categories with screenshots */}
+            {topCategories.length > 0 && (
                 <section className="section">
-                    <h2 className="section-heading">📂 Categories</h2>
-                    <div className="category-grid">
-                        {Object.entries(CATEGORY_META).map(([cat, meta]) => {
-                            const found = stats.byCategory.find((s) => s.category === cat)
-                            const count = found?.count || 0
-                            return (
-                                <motion.div key={cat} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-                                    <Link to={`/category/${encodeURIComponent(cat)}`} className="category-card" style={{ '--cat-color': meta.color }}>
-                                        <div className="category-card-icon">{meta.icon}</div>
-                                        <div className="category-card-name">{cat}</div>
-                                        <div className="category-card-count" style={{ color: meta.color }}>
-                                            {count}
-                                        </div>
-                                    </Link>
-                                </motion.div>
-                            )
-                        })}
+                    <h2 className="section-heading">Top Categories</h2>
+                    <div className="top-categories">
+                        {topCategories.map((catData, i) => (
+                            <motion.div
+                                key={catData.category}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.06 }}
+                            >
+                                <Link
+                                    to={`/category/${encodeURIComponent(catData.category)}`}
+                                    className="top-cat-card"
+                                    style={{ '--cat-color': catData.meta.color }}
+                                >
+                                    <div className="top-cat-icon">{catData.meta.icon}</div>
+                                    <div className="top-cat-info">
+                                        <span className="top-cat-name">{catData.category}</span>
+                                        <span className="top-cat-count" style={{ color: catData.meta.color }}>
+                                            {catData.count} screenshot{catData.count !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    <div className="top-cat-arrow">→</div>
+                                </Link>
+                            </motion.div>
+                        ))}
                     </div>
+
+                    {/* Show More */}
+                    {(restCategories.length > 0 || allCategories.length > 5) && (
+                        <>
+                            <motion.button
+                                className="show-more-btn"
+                                onClick={() => setShowAllCategories(!showAllCategories)}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                {showAllCategories ? 'Show Less' : `Show All ${allCategories.length} Categories`}
+                            </motion.button>
+
+                            <AnimatePresence>
+                                {showAllCategories && (
+                                    <motion.div
+                                        className="all-categories-grid"
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        {allCategories.slice(5).map((catData) => (
+                                            <Link
+                                                key={catData.category}
+                                                to={`/category/${encodeURIComponent(catData.category)}`}
+                                                className="mini-cat-card"
+                                                style={{ '--cat-color': catData.meta.color }}
+                                            >
+                                                <span className="mini-cat-icon">{catData.meta.icon}</span>
+                                                <span className="mini-cat-name">{catData.category}</span>
+                                                <span className="mini-cat-count" style={{ color: catData.meta.color }}>{catData.count}</span>
+                                            </Link>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </>
+                    )}
                 </section>
             )}
 
             {/* Recent Screenshots */}
             {recent.length > 0 && (
                 <section className="section">
-                    <h2 className="section-heading">🕐 Recent</h2>
+                    <h2 className="section-heading">Recent</h2>
                     <div className="recent-grid">
                         <AnimatePresence>
                             {recent.map((sc, i) => {
@@ -291,7 +343,6 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* Upgrade Modal for Merge Interruption */}
             <UpgradeModal
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}

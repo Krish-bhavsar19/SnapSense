@@ -4,6 +4,7 @@ import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import CategoryView from './pages/CategoryView'
 import Navbar from './components/Navbar'
+import Stardust from './components/Stardust'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ function App() {
 
   return (
     <div className="app">
+      <Stardust />
       {user && <Navbar />}
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
