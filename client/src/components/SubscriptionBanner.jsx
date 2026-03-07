@@ -40,7 +40,16 @@ export default function SubscriptionBanner() {
 
     const { status, currentPeriodEnd, daysRemaining, isExpired } = subscription
     const expiryDate = new Date(currentPeriodEnd)
-    
+
+    // Format date in a standard, readable way (e.g., March 7, 2026)
+    const formatDate = (date) => {
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
     // Determine urgency level
     let urgency = 'normal'
     let message = ''
@@ -56,7 +65,7 @@ export default function SubscriptionBanner() {
         icon = <AlertCircle size={20} />
     } else if (status === 'cancelled') {
         urgency = 'warning'
-        message = `Subscription cancelled - active until ${expiryDate.toLocaleDateString()}`
+        message = `Subscription cancelled - active until ${formatDate(expiryDate)}`
         icon = <AlertCircle size={20} />
     } else if (status === 'payment_failed') {
         urgency = 'critical'
@@ -66,7 +75,7 @@ export default function SubscriptionBanner() {
         urgency = 'warning'
         message = `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining in your subscription`
     } else {
-        message = `PRO subscription active until ${expiryDate.toLocaleDateString()}`
+        message = `PRO subscription active until ${formatDate(expiryDate)}`
     }
 
     return (

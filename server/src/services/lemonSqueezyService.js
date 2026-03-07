@@ -58,11 +58,11 @@ async function createCheckoutSession(user, months = 1) {
             expiresAt: null,
             preview: true, // Set to false in production
             testMode: true, // Set to false in production
+            customPrice: totalPrice * 100, // Price in paise (smallest currency unit)
             productOptions: {
                 name: `SnapSense Pro - ${months} Month${months > 1 ? 's' : ''}${discount > 0 ? ` (${discount}% OFF)` : ''}`,
                 description: `${months} month${months > 1 ? 's' : ''} of unlimited screenshot storage and AI-powered organization`,
                 redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true&months=${months}`,
-                price: totalPrice * 100, // Price in paise (smallest currency unit)
             }
         });
 
