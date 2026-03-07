@@ -43,10 +43,9 @@ async function createCheckoutSession(user, months = 1) {
                 name: user.name,
                 custom: {
                     user_id: user._id.toString(),
-                    months: months,
-                    discount_applied: discount,
+                    months: months.toString(),
+                    discount_applied: discount.toString(),
                 },
-                discount: discount > 0,
             },
             expiresAt: null,
             preview: true, // Set to false in production

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import UploadZone from '../components/UploadZone'
 import { useAuth } from '../context/AuthContext'
 import UpgradeModal from '../components/UpgradeModal'
+import SubscriptionBanner from '../components/SubscriptionBanner'
 
 const CATEGORY_META = {
     'Ticket': { icon: '🎫', color: '#f59e0b' },
@@ -176,6 +177,9 @@ export default function Dashboard() {
                     )}
                 </div>
             </div>
+
+            {/* Subscription Status Banner */}
+            <SubscriptionBanner />
 
             {/* Upload Zone */}
             <section className="section">

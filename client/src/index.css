@@ -1176,6 +1176,214 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .payment-methods p {
   font-size: 0.85rem;
   color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.refund-policy {
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* Plan Selector (Multi-month) */
+.plan-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.plan-option {
+  position: relative;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+}
+
+.plan-option:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.plan-option.selected {
+  border-color: var(--purple);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.15));
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+.plan-option.popular {
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.popular-badge,
+.best-value-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.popular-badge {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #0a0a14;
+}
+
+.best-value-badge {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.plan-duration {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.plan-pricing {
+  margin-bottom: 6px;
+}
+
+.total-price {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--purple-bright);
+  display: block;
+}
+
+.per-month {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.savings {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--green);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.loading-plans {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.billing-info {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--green);
+  display: block;
+  margin-top: 4px;
+}
+
+/* Subscription Banner */
+.subscription-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  transition: all 0.3s;
+}
+
+.subscription-banner.normal {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08));
+}
+
+.subscription-banner.warning {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(245, 158, 11, 0.08));
+}
+
+.subscription-banner.critical {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.08));
+}
+
+.banner-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.subscription-banner.warning .banner-icon {
+  color: #fbbf24;
+}
+
+.subscription-banner.critical .banner-icon {
+  color: #ef4444;
+}
+
+.banner-content {
+  flex: 1;
+}
+
+.banner-message {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.banner-progress {
+  margin-top: 8px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--blue));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.subscription-banner.warning .progress-fill {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.subscription-banner.critical .progress-fill {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.banner-action {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: var(--gradient-main);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+
+.banner-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
 }
 
 /* ─── Responsive ───────────────────────────────────────────────────────────── */
@@ -1191,4 +1399,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   .plans-comparison { grid-template-columns: 1fr; }
   .modal-content { padding: 24px; }
   .paywall-state { padding: 32px 20px; min-height: 280px; }
+  .plan-selector { grid-template-columns: 1fr 1fr; }
+  .subscription-banner { flex-direction: column; text-align: center; }
+  .banner-action { width: 100%; }
 }

@@ -304,6 +304,40 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
             await recordEventInPayment(eventData.id, eventName, eventId, event);
             break;
 
+        case 'order_refunded':
+            console.log(`💸 Processing order_refunded for order ${eventData.id}`);
+            
+            // Find user by order ID
+            const refundedUser = await User.findOne({
+                'subscription.lsOrderId': eventData.id,
+            });
+
+            if (refundedUser) {
+                // Downgrade user to free immediately on refund
+                refundedUser.tier = 'free';
+                refundedUser.subscription.status = 'refunded';
+                await refundedUser.save();
+                console.log(`✅ User ${refundedUser._id} downgraded to free (payment refunded)`);
+            }
+
+            // Update payment record status
+            await Payment.findOneAndUpdate(
+                { lsOrderId: eventData.id },
+                {
+                    status: 'refunded',
+                    $push: {
+                        webhookEvents: {
+                            eventName,
+                            receivedAt: new Date(),
+                            lsEventId: eventId,
+                            payload: event,
+                        },
+                        idempotencyKeys: eventId,
+                    },
+                }
+            );
+            break;
+
         default:
             console.log(`⚠️  Unhandled event type: ${eventName}`);
     }

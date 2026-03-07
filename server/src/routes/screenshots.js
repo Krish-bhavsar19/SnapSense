@@ -409,9 +409,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
         // ── Remove from MongoDB ────────────────────────────────────────────
         await screenshot.deleteOne();
 
-        // Decrement screenshot count
+        // Decrement screenshot count (prevent negative values)
+        const currentCount = user.screenshotCount || 0;
+        const currentTotal = user.totalUploads || 0;
+        
         await User.findByIdAndUpdate(user._id, {
-            $inc: { screenshotCount: -1, totalUploads: -1 },
+            $set: { 
+                screenshotCount: Math.max(0, currentCount - 1),
+                totalUploads: Math.max(0, currentTotal - 1)
+            },
         });
 
         res.json({ success: true, message: 'Screenshot deleted from all locations' });
