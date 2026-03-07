@@ -31,6 +31,14 @@ async function createCheckoutSession(user, months = 1) {
     const discount = discounts[months] || 0;
     const totalPrice = Math.round(basePricePerMonth * months * (1 - discount / 100));
     
+    console.log(`💰 Checkout pricing:`, {
+        months,
+        basePricePerMonth,
+        discount: `${discount}%`,
+        totalPrice: `₹${totalPrice}`,
+        priceInPaise: totalPrice * 100
+    });
+    
     try {
         const checkout = await createCheckout(storeId, variantId, {
             checkoutOptions: {
@@ -54,6 +62,7 @@ async function createCheckoutSession(user, months = 1) {
                 name: `SnapSense Pro - ${months} Month${months > 1 ? 's' : ''}${discount > 0 ? ` (${discount}% OFF)` : ''}`,
                 description: `${months} month${months > 1 ? 's' : ''} of unlimited screenshot storage and AI-powered organization`,
                 redirectUrl: `${process.env.CLIENT_URL}/dashboard?upgraded=true&months=${months}`,
+                price: totalPrice * 100, // Price in paise (smallest currency unit)
             }
         });
 
