@@ -59,8 +59,8 @@ router.get('/me', (req, res) => {
     if (!req.user) {
         return res.status(401).json({ success: false, user: null });
     }
-    // Don't send tokens to frontend
-    const { googleId, accessToken, refreshToken, __v, ...safeUser } =
+    // Strip sensitive and internal fields before sending to frontend
+    const { googleId, accessToken, refreshToken, __v, driveRootFolderId, driveCategoryFolders, sheetsId, ...safeUser } =
         req.user.toObject();
     res.json({ success: true, user: safeUser });
 });
@@ -70,8 +70,8 @@ router.get('/me', (req, res) => {
 // Authenticated users send their anonymous sessionId to execute all pending Actions
 router.post('/merge', requireAuth, async (req, res) => {
     const { sessionId, pendingCards } = req.body;
-    if (!sessionId) {
-        return res.status(400).json({ success: false, message: 'sessionId is required' });
+    if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 128) {
+        return res.status(400).json({ success: false, message: 'Valid sessionId string is required' });
     }
 
     try {
@@ -133,7 +133,8 @@ router.post('/merge', requireAuth, async (req, res) => {
                     );
                     if (matchedCard) {
                         console.log(`✅ [Merge] Verified action ${action._id} against client card`);
-                        finalMetadata = { ...action.metadata, ...matchedCard };
+                        // Only allow safe display-only fields from client, never override server metadata
+                        finalMetadata = action.metadata;
                     }
                 }
 
@@ -247,7 +248,7 @@ router.post('/merge', requireAuth, async (req, res) => {
                 console.error(`❌ Failed to merge action ${action._id}:`, actionErr.message);
                 // If it fails after claiming, we mark it as failed so it doesn't get stuck in 'completed' incorrectly
                 await Action.findByIdAndUpdate(action._id, { status: 'failed' });
-                results.push({ actionId: action._id, status: 'failed', error: actionErr.message });
+                results.push({ actionId: action._id, status: 'failed' });
             }
         }
 
@@ -275,7 +276,7 @@ router.post('/merge', requireAuth, async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Merge error:', err);
-        return res.status(500).json({ success: false, message: err.message || 'Internal server error' });
+        return res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 

@@ -40,9 +40,9 @@ Return a JSON object ONLY (no markdown, no extra text) with this exact structure
 }
 
 Rules:
-- Location: screenshots of places to visit, restaurants, travel destinations, shops, or cafes
+- Location: ONLY classify as Location when the screenshot explicitly mentions or shows a specific place name, address, restaurant name, hotel, shop, landmark, or travel destination. There MUST be a clearly visible place name, map, directions, or address in the screenshot. Do NOT classify generic outdoor photos, scenic images, or photos that merely show a place without naming it as Location — those should be Wallpaper or Other instead.
 - Ticket: flight/train/bus/event/concert/sports tickets with booking info
-- Wallpaper: decorative/aesthetic images used as backgrounds
+- Wallpaper: decorative/aesthetic images used as backgrounds, scenic photos, nature shots, or any image without explicit text identifying a specific place
 - LinkedIn Profile: screenshots of a LinkedIn user profile page
 - LinkedIn Post: screenshots of a LinkedIn post/article/feed
 - Social Media Post: Twitter/Instagram/Facebook/TikTok/Reddit posts

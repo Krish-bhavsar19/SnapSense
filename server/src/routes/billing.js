@@ -94,10 +94,25 @@ router.get('/status', requireAuth, async (req, res) => {
  * POST /api/billing/verify-upgrade
  * Because local webhooks fail on localhost during testing, 
  * this endpoint allows the frontend to manually verify the upgrade instantly.
+ * DISABLED in production — real upgrades happen via Lemon Squeezy webhooks.
  */
 router.post('/verify-upgrade', requireAuth, async (req, res) => {
+    if (process.env.NODE_ENV === 'production' || !process.env.ENABLE_TEST_ENDPOINTS) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+
     try {
         const user = req.user;
+
+        // If already upgraded by a real webhook, don't overwrite with fake IDs
+        if (user.tier === 'pro' && user.subscription?.status === 'active'
+            && user.subscription?.lsOrderId && !user.subscription.lsOrderId.startsWith('hackathon-test')) {
+            return res.json({
+                success: true,
+                tier: 'pro',
+                message: 'Already upgraded via payment webhook.',
+            });
+        }
 
         const orderId = 'hackathon-test-order-' + Date.now();
         const subId = 'hackathon-test-sub-' + Date.now();

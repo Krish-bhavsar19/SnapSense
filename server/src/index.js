@@ -6,6 +6,7 @@ const MongoStore = require('connect-mongo');
 const passport = require('passport');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth');
 const screenshotRoutes = require('./routes/screenshots');
@@ -22,6 +23,12 @@ app.set('trust proxy', 1);
 
 // ─── Core Middleware (applied before DB connects) ─────────────────────────────
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // CSP managed by frontend
+  crossOriginEmbedderPolicy: false, // Allow embedded checkout
+}));
+
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
@@ -33,8 +40,8 @@ app.use(
 // CRITICAL: Raw body parser for Lemon Squeezy webhooks (BEFORE express.json())
 app.use('/api/webhook/lemonsqueezy', express.raw({ type: 'application/json' }));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Basic health check (responds even before DB connects)
@@ -59,10 +66,18 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ MongoDB connected');
 
+    // Require SESSION_SECRET in production
+    if (!process.env.SESSION_SECRET) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('SESSION_SECRET environment variable is required in production');
+      }
+      console.warn('⚠️  SESSION_SECRET not set — using insecure default (dev only)');
+    }
+
     // Session store (requires MongoDB)
     app.use(
       session({
-        secret: process.env.SESSION_SECRET || 'snapsense-secret',
+        secret: process.env.SESSION_SECRET || 'dev-only-insecure-secret-' + require('crypto').randomBytes(16).toString('hex'),
         resave: false,
         saveUninitialized: false,
         store: MongoStore.create({

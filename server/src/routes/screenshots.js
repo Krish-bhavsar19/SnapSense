@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { checkUploadLimit } = require('../middleware/tierCheck');
@@ -211,7 +212,7 @@ router.post(
             });
         } catch (err) {
             console.error('❌ Upload error:', err);
-            return res.status(500).json({ success: false, message: err.message || 'Internal server error' });
+            return res.status(500).json({ success: false, message: 'Internal server error' });
         }
     }
 );
@@ -228,8 +229,8 @@ router.post(
             }
 
             const sessionId = req.headers['x-session-id'];
-            if (!sessionId) {
-                return res.status(400).json({ success: false, message: 'x-session-id header is required' });
+            if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 128) {
+                return res.status(400).json({ success: false, message: 'Valid x-session-id header is required' });
             }
 
             const { buffer, mimetype, originalname } = req.file;
@@ -313,7 +314,7 @@ router.post(
             });
         } catch (err) {
             console.error('❌ Anonymous upload error:', err);
-            return res.status(500).json({ success: false, message: err.message || 'Internal server error' });
+            return res.status(500).json({ success: false, message: 'Internal server error' });
         }
     }
 );
@@ -322,8 +323,8 @@ router.post(
 // ─── GET /api/screenshots — All screenshots for user ─────────────────────────
 router.get('/', requireAuth, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
         const skip = (page - 1) * limit;
 
         const [screenshots, total] = await Promise.all([
@@ -341,7 +342,7 @@ router.get('/', requireAuth, async (req, res) => {
             pagination: { page, limit, total, pages: Math.ceil(total / limit) },
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 
@@ -358,7 +359,7 @@ router.get('/category/:cat', requireAuth, async (req, res) => {
 
         res.json({ success: true, category, data: screenshots });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 
@@ -379,13 +380,17 @@ router.get('/stats', requireAuth, async (req, res) => {
             byCategory: stats.map((s) => ({ category: s._id, count: s.count })),
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 
 // ─── DELETE /api/screenshots/:id ─────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req, res) => {
     try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid screenshot ID' });
+        }
+
         const screenshot = await Screenshot.findOne({
             _id: req.params.id,
             userId: req.user._id,
@@ -447,7 +452,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
         res.json({ success: true, message: 'Screenshot deleted from all locations' });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 

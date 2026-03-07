@@ -33,11 +33,11 @@ router.post('/lemonsqueezy', async (req, res) => {
         hmac.update(req.body);
         const digest = hmac.digest('hex');
 
-        // Timing-safe comparison
-        const isValid = crypto.timingSafeEqual(
-            Buffer.from(signature),
-            Buffer.from(digest)
-        );
+        // Timing-safe comparison (ensure equal length to avoid timingSafeEqual throw)
+        const sigBuffer = Buffer.from(signature);
+        const digestBuffer = Buffer.from(digest);
+        const isValid = sigBuffer.length === digestBuffer.length &&
+            crypto.timingSafeEqual(sigBuffer, digestBuffer);
 
         if (!isValid) {
             console.error('❌ Invalid webhook signature');
@@ -92,7 +92,7 @@ router.post('/lemonsqueezy', async (req, res) => {
     } catch (error) {
         // Log error but still return 200 to prevent retries
         console.error('❌ Webhook processing error:', error);
-        return res.status(200).json({ received: true, error: error.message });
+        return res.status(200).json({ received: true, error: 'Processing error' });
     }
 });
 
@@ -129,6 +129,8 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
                 const currentEnd = new Date(user.subscription.currentPeriodEnd);
                 const daysToAdd = months * 30;
                 user.subscription.currentPeriodEnd = new Date(currentEnd.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+                // Always update to real LS order ID (verify-upgrade may have set a fake one)
+                user.subscription.lsOrderId = eventData.id;
             } else {
                 // Calculate proper expiry date based on purchased months
                 const expiryDate = new Date();
@@ -309,10 +311,19 @@ async function handleWebhookEvent(event, eventName, eventId, userId) {
         case 'order_refunded':
             console.log(`💸 Processing order_refunded for order ${eventData.id}`);
 
-            // Find user by order ID
-            const refundedUser = await User.findOne({
+            // Find user by order ID (primary lookup)
+            let refundedUser = await User.findOne({
                 'subscription.lsOrderId': eventData.id,
             });
+
+            // Fallback: find via Payment record (handles cases where lsOrderId was overwritten)
+            if (!refundedUser) {
+                console.log(`⚠️  User not found by lsOrderId, trying Payment lookup...`);
+                const refundPayment = await Payment.findOne({ lsOrderId: eventData.id });
+                if (refundPayment) {
+                    refundedUser = await User.findById(refundPayment.userId);
+                }
+            }
 
             if (refundedUser) {
                 // Downgrade user to free immediately on refund
@@ -365,10 +376,14 @@ async function recordEventInPayment(lsSubscriptionId, eventName, eventId, event)
 
 /**
  * POST /api/webhook/test-upgrade
- * Manual endpoint to test upgrading a user to PRO (for development)
+ * Manual endpoint to test upgrading a user to PRO (for development only)
  * Send: { "userId": "your_user_id" }
  */
 router.post('/test-upgrade', async (req, res) => {
+    if (process.env.NODE_ENV === 'production' || !process.env.ENABLE_TEST_ENDPOINTS) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+
     try {
         const { userId } = req.body;
 
@@ -404,7 +419,7 @@ router.post('/test-upgrade', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Test upgrade error:', error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 });
 
