@@ -60,13 +60,15 @@ router.post('/lemonsqueezy', async (req, res) => {
     }
 
     // STEP 2: Idempotency Check
-    const eventId = event.meta?.event_id;
-    const userId = event.meta?.custom_data?.user_id;
+    // Lemon Squeezy meta contains: event_name, webhook_id, custom_data (no event_id)
+    // Use combination of webhook_id + event_name + data.id for idempotency
     const eventName = event.meta?.event_name;
+    const userId = event.meta?.custom_data?.user_id;
+    const eventId = `${event.meta?.webhook_id || 'unknown'}_${eventName}_${event.data?.id}`;
 
-    if (!eventId) {
-        console.error('❌ Missing event_id in webhook');
-        return res.status(400).json({ error: 'Missing event_id' });
+    if (!eventName) {
+        console.error('❌ Missing event_name in webhook');
+        return res.status(400).json({ error: 'Missing event_name' });
     }
 
     console.log(`📨 Webhook received: ${eventName} (Event ID: ${eventId})`);
