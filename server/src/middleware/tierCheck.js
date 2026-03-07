@@ -18,12 +18,14 @@ const requirePro = (req, res, next) => {
  * Free tier: 10 screenshots/month, auto-resets every 30 days
  */
 const checkUploadLimit = async (req, res, next) => {
-    const user = req.user;
-
     // PRO users have unlimited uploads
-    if (user.tier === 'pro') {
+    if (req.user.tier === 'pro') {
         return next();
     }
+
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(401).json({ error: 'USER_NOT_FOUND' });
 
     // Free tier logic
     const now = new Date();

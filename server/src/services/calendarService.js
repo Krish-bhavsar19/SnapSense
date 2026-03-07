@@ -107,4 +107,27 @@ async function createCalendarEvent(user, eventData) {
     };
 }
 
-module.exports = { createCalendarEvent, shouldCreateCalendarEvent };
+/**
+ * Deletes a Google Calendar event by its eventId.
+ * @param {Object} user - User model instance
+ * @param {string} eventId - The Calendar event ID to delete
+ */
+async function deleteCalendarEvent(user, eventId) {
+    if (!eventId) return;
+    const calendar = getCalendarClient(user);
+    try {
+        await calendar.events.delete({
+            calendarId: 'primary',
+            eventId,
+        });
+        console.log(`🗑️  Calendar event deleted: ${eventId}`);
+    } catch (err) {
+        if (err.code === 404 || err.code === 410) {
+            console.warn(`⚠️  Calendar event not found (already deleted?): ${eventId}`);
+        } else {
+            throw err;
+        }
+    }
+}
+
+module.exports = { createCalendarEvent, shouldCreateCalendarEvent, deleteCalendarEvent };

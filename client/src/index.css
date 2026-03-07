@@ -443,6 +443,34 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   color: var(--purple-bright);
 }
 
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.upgrade-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.35);
+  transition: box-shadow 0.2s, opacity 0.2s;
+  letter-spacing: 0.01em;
+}
+.upgrade-header-btn:hover {
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.6);
+  opacity: 0.92;
+}
+
 .section { margin-bottom: 48px; }
 
 .section-heading {

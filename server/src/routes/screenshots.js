@@ -4,11 +4,12 @@ const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { checkUploadLimit } = require('../middleware/tierCheck');
 const { classifyScreenshot } = require('../services/groqService');
-const { uploadFileToDrive } = require('../services/driveService');
-const { appendRow, appendQuoteRow, appendTransactionRow, appendLocationRow } = require('../services/sheetsService');
+const { uploadFileToDrive, deleteFileFromDrive } = require('../services/driveService');
+const { appendRow, appendQuoteRow, appendTransactionRow, appendLocationRow, deleteSheetRow } = require('../services/sheetsService');
 const {
     createCalendarEvent,
     shouldCreateCalendarEvent,
+    deleteCalendarEvent,
 } = require('../services/calendarService');
 const {
     createGoogleTask,
@@ -360,14 +361,60 @@ router.get('/stats', requireAuth, async (req, res) => {
 // ─── DELETE /api/screenshots/:id ─────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req, res) => {
     try {
-        const screenshot = await Screenshot.findOneAndDelete({
+        const screenshot = await Screenshot.findOne({
             _id: req.params.id,
             userId: req.user._id,
         });
+
         if (!screenshot) {
             return res.status(404).json({ success: false, message: 'Not found' });
         }
-        res.json({ success: true, message: 'Screenshot deleted' });
+
+        const user = await User.findById(req.user._id);
+
+        // ── Cascade: Delete from Google Drive ──────────────────────────────
+        if (screenshot.driveFileId) {
+            try {
+                await deleteFileFromDrive(user, screenshot.driveFileId);
+            } catch (err) {
+                console.error('⚠️  Drive delete failed (non-critical):', err.message);
+            }
+        }
+
+        // ── Cascade: Delete from Google Calendar ───────────────────────────
+        if (screenshot.calendarEventId) {
+            try {
+                await deleteCalendarEvent(user, screenshot.calendarEventId);
+            } catch (err) {
+                console.error('⚠️  Calendar delete failed (non-critical):', err.message);
+            }
+        }
+
+        // ── Cascade: Delete row from Google Sheets ─────────────────────────
+        if (screenshot.sheetsRowNumber) {
+            // Determine which sheet tab this screenshot was logged to
+            const category = screenshot.category;
+            let sheetName = 'Screenshots';
+            if (category === 'Quote') sheetName = 'Quotes';
+            else if (category === 'Payment') sheetName = 'Transactions';
+            else if (category === 'Location') sheetName = 'Locations';
+
+            try {
+                await deleteSheetRow(user, screenshot.sheetsRowNumber, sheetName);
+            } catch (err) {
+                console.error('⚠️  Sheets row delete failed (non-critical):', err.message);
+            }
+        }
+
+        // ── Remove from MongoDB ────────────────────────────────────────────
+        await screenshot.deleteOne();
+
+        // Decrement screenshot count
+        await User.findByIdAndUpdate(user._id, {
+            $inc: { screenshotCount: -1, totalUploads: -1 },
+        });
+
+        res.json({ success: true, message: 'Screenshot deleted from all locations' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

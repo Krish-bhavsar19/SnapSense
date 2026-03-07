@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const User = require('../models/User');
 
 const CATEGORY_FOLDER_NAMES = [
+    'Location',
     'Ticket',
     'Wallpaper',
     'LinkedIn Profile',
@@ -101,7 +102,8 @@ async function uploadFileToDrive(user, buffer, filename, mimeType, category) {
     const updatedUser = await ensureUserFolders(user);
     const drive = getDriveClient(updatedUser);
 
-    const categoryFolderId = updatedUser.driveCategoryFolders.get(category);
+    const categoryFolderId = updatedUser.driveCategoryFolders.get(category)
+        || updatedUser.driveRootFolderId; // Fallback to root if category folder missing
 
     const { Readable } = require('stream');
     const stream = Readable.from(buffer);
@@ -134,4 +136,25 @@ async function uploadFileToDrive(user, buffer, filename, mimeType, category) {
     };
 }
 
-module.exports = { ensureUserFolders, uploadFileToDrive };
+/**
+ * Deletes a file from Google Drive by its fileId.
+ * @param {Object} user - User model instance
+ * @param {string} fileId - The Drive file ID to delete
+ */
+async function deleteFileFromDrive(user, fileId) {
+    if (!fileId) return;
+    const drive = getDriveClient(user);
+    try {
+        await drive.files.delete({ fileId });
+        console.log(`🗑️  Drive file deleted: ${fileId}`);
+    } catch (err) {
+        // 404 means already gone — treat as success
+        if (err.code === 404) {
+            console.warn(`⚠️  Drive file not found (already deleted?): ${fileId}`);
+        } else {
+            throw err;
+        }
+    }
+}
+
+module.exports = { ensureUserFolders, uploadFileToDrive, deleteFileFromDrive };

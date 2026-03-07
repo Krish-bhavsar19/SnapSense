@@ -267,4 +267,51 @@ async function appendLocationRow(user, rowData) {
     return match ? parseInt(match[2]) : null;
 }
 
-module.exports = { ensureUserSheet, appendRow, appendQuoteRow, appendTransactionRow, appendLocationRow };
+/**
+ * Clears a specific row from the user's SnapSense spreadsheet.
+ * NOTE: Google Sheets API doesn't support deleting rows by number directly
+ * without knowing the sheet. We clear the row content to keep the sheet intact.
+ * @param {Object} user - User model instance
+ * @param {number} rowNumber - The 1-indexed row number in the sheet
+ * @param {string} sheetName - The sheet tab name (default: 'Screenshots')
+ */
+async function deleteSheetRow(user, rowNumber, sheetName = 'Screenshots') {
+    if (!rowNumber || !user.sheetsId) return;
+    const sheets = getSheetsClient(user);
+    try {
+        // Get the sheet's ID (gid) for the given tab name
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: user.sheetsId });
+        const sheetMeta = spreadsheet.data.sheets.find(s => s.properties.title === sheetName);
+        if (!sheetMeta) {
+            console.warn(`⚠️  Sheet tab "${sheetName}" not found, skipping row delete.`);
+            return;
+        }
+        const sheetId = sheetMeta.properties.sheetId;
+
+        // Delete the actual row by shifting rows above it up
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: user.sheetsId,
+            requestBody: {
+                requests: [{
+                    deleteDimension: {
+                        range: {
+                            sheetId,
+                            dimension: 'ROWS',
+                            startIndex: rowNumber - 1, // 0-indexed
+                            endIndex: rowNumber,       // exclusive
+                        },
+                    },
+                }],
+            },
+        });
+        console.log(`🗑️  Deleted row ${rowNumber} from sheet "${sheetName}"`);
+    } catch (err) {
+        if (err.code === 404) {
+            console.warn(`⚠️  Sheet not found (already deleted?): ${user.sheetsId}`);
+        } else {
+            throw err;
+        }
+    }
+}
+
+module.exports = { ensureUserSheet, appendRow, appendQuoteRow, appendTransactionRow, appendLocationRow, deleteSheetRow };

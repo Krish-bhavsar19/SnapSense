@@ -25,8 +25,8 @@ const CATEGORY_META = {
 export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10, tier = 'free' }) {
     const [uploading, setUploading] = useState(false)
     const [progress, setProgress] = useState(0)
-    const [result, setResult] = useState(null)
-    const [preview, setPreview] = useState(null)
+    const [results, setResults] = useState([])
+    const [previews, setPreviews] = useState([])
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeTrigger, setUpgradeTrigger] = useState('manual')
 
@@ -41,83 +41,116 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
         return 'usage-badge success'
     }
 
+    const onDropRejected = useCallback((rejectedFiles) => {
+        const hasTooMany = rejectedFiles.some(f =>
+            f.errors?.some(e => e.code === 'too-many-files')
+        )
+        if (hasTooMany) {
+            toast.error('You can only upload up to 3 photos at a time. Please try again with 3 or fewer files.', { duration: 4000 })
+        }
+    }, [])
+
     const onDrop = useCallback(
         async (acceptedFiles) => {
-            const file = acceptedFiles[0]
-            if (!file) return
+            if (!acceptedFiles || acceptedFiles.length === 0) return
 
-            // File size check (max 10MB)
+            // Warn and cap if more than 3 somehow pass through
+            if (acceptedFiles.length > 3) {
+                toast.error('Only the first 3 photos will be uploaded. Please select up to 3 at a time.')
+            }
+            const filesToUpload = acceptedFiles.slice(0, 3)
+
+            // File validation check
             const maxSize = 10 * 1024 * 1024 // 10MB
-            if (file.size > maxSize) {
-                toast.error('File too large. Maximum size is 10MB.')
-                return
+            const validFiles = []
+            for (const file of filesToUpload) {
+                if (file.size > maxSize) {
+                    toast.error(`File ${file.name} is too large. Maximum size is 10MB.`)
+                    continue
+                }
+                if (!file.type.startsWith('image/')) {
+                    toast.error(`File ${file.name} is not an image (PNG, JPG, WEBP)`)
+                    continue
+                }
+                validFiles.push(file)
             }
 
-            // File type check
-            if (!file.type.startsWith('image/')) {
-                toast.error('Only image files are allowed (PNG, JPG, WEBP)')
-                return
-            }
+            if (validFiles.length === 0) return
 
-            // Preview
-            const reader = new FileReader()
-            reader.onload = (e) => setPreview(e.target.result)
-            reader.readAsDataURL(file)
+            // Generate Previews
+            const newPreviews = await Promise.all(validFiles.map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader()
+                    reader.onload = (e) => resolve(e.target.result)
+                    reader.readAsDataURL(file)
+                })
+            }))
 
+            setPreviews(newPreviews)
             setUploading(true)
-            setResult(null)
+            setResults([])
             setProgress(10)
 
-            const formData = new FormData()
-            formData.append('screenshot', file)
+            const totalFiles = validFiles.length
+            const newResults = []
 
-            try {
-                setProgress(30)
-                const res = await axios.post('/api/screenshots/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                    onUploadProgress: (e) => {
-                        const pct = Math.round((e.loaded * 50) / e.total)
-                        setProgress(30 + pct)
-                    },
-                })
-                setProgress(100)
-                setResult(res.data.screenshot)
-                onSuccess?.(res.data)
-            } catch (err) {
-                // Handle 402 (limit reached) or 403 (pro feature)
-                if (err.response?.status === 402) {
-                    setUpgradeTrigger('limit_reached')
-                    setShowUpgradeModal(true)
-                } else if (err.response?.status === 403) {
-                    setUpgradeTrigger('pro_feature')
-                    setShowUpgradeModal(true)
-                } else {
-                    toast.error(err.response?.data?.message || 'Upload failed')
+            for (let i = 0; i < totalFiles; i++) {
+                const file = validFiles[i]
+                const baseProgress = 10 + (i * (90 / totalFiles))
+                const fileProgressShare = 90 / totalFiles
+                
+                const formData = new FormData()
+                formData.append('screenshot', file)
+
+                try {
+                    setProgress(baseProgress + (fileProgressShare * 0.2))
+                    const res = await axios.post('/api/screenshots/upload', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        onUploadProgress: (e) => {
+                            const pct = (e.loaded / e.total)
+                            setProgress(baseProgress + (fileProgressShare * (0.2 + (pct * 0.8))))
+                        },
+                    })
+                    newResults.push(res.data.screenshot)
+                    onSuccess?.(res.data)
+                } catch (err) {
+                    if (err.response?.status === 402) {
+                        setUpgradeTrigger('limit_reached')
+                        setShowUpgradeModal(true)
+                        break
+                    } else if (err.response?.status === 403) {
+                        setUpgradeTrigger('pro_feature')
+                        setShowUpgradeModal(true)
+                        break
+                    } else {
+                        toast.error(err.response?.data?.message || `Upload failed for ${file.name}`)
+                    }
                 }
-                setPreview(null)
-            } finally {
-                setUploading(false)
-                setTimeout(() => setProgress(0), 1000)
             }
+
+            setProgress(100)
+            setResults(newResults)
+            setUploading(false)
+            setTimeout(() => setProgress(0), 1000)
         },
         [onSuccess]
     )
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
+        onDropRejected,
         accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
         maxSize: 10 * 1024 * 1024, // 10MB
-        multiple: false,
+        multiple: true,
+        maxFiles: 3,
         disabled: uploading || limitReached,
     })
 
     const reset = () => {
-        setResult(null)
-        setPreview(null)
+        setResults([])
+        setPreviews([])
         setProgress(0)
     }
-
-    const catMeta = result ? CATEGORY_META[result.category] || CATEGORY_META['Other'] : null
 
     return (
         <div className="upload-section">
@@ -138,7 +171,7 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
             )}
 
             <AnimatePresence mode="wait">
-                {!result ? (
+                {results.length === 0 ? (
                     <motion.div
                         key="dropzone"
                         initial={{ opacity: 0 }}
@@ -173,18 +206,22 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                                 id="upload-dropzone"
                             >
                                 <input {...getInputProps()} id="screenshot-file-input" />
-                                {preview && !uploading && (
-                                    <img src={preview} alt="preview" className="drop-preview" />
+                                {previews.length > 0 && !uploading && (
+                                    <div className="previews-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                        {previews.map((prev, i) => (
+                                            <img key={i} src={prev} alt={`preview-${i}`} className="drop-preview" style={{ height: '80px', width: 'auto', borderRadius: '8px' }} />
+                                        ))}
+                                    </div>
                                 )}
-                                {!preview && (
+                                {previews.length === 0 && (
                                     <>
                                         <div className="drop-icon">
                                             {isDragActive ? '⬇️' : '📤'}
                                         </div>
                                         <p className="drop-title">
-                                            {isDragActive ? 'Drop it!' : 'Drop a screenshot here'}
+                                            {isDragActive ? 'Drop them!' : 'Drop up to 3 screenshots here'}
                                         </p>
-                                        <p className="drop-sub">or click to browse · PNG, JPG, WEBP up to 10MB</p>
+                                        <p className="drop-sub">or click to browse · PNG, JPG, WEBP up to 10MB each</p>
                                     </>
                                 )}
                                 {uploading && (
@@ -210,36 +247,42 @@ export default function UploadZone({ onSuccess, screenshotCount = 0, limit = 10,
                 ) : (
                     <motion.div
                         key="result"
-                        className="result-card"
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        style={{ '--cat-color': catMeta.color }}
+                        className="results-wrapper"
                     >
-                        <div className="result-header">
-                            <div className="result-category-badge" style={{ background: catMeta.color + '22', border: `1px solid ${catMeta.color}66`, color: catMeta.color }}>
-                                {catMeta.icon} {result.category}
-                            </div>
-                            <div className="result-confidence">
-                                {Math.round((result.metadata?.confidence || 0) * 100)}% confident
-                            </div>
+                        <div className="results-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {results.map((res, i) => {
+                                const meta = CATEGORY_META[res.category] || CATEGORY_META['Other']
+                                return (
+                                    <div key={res._id || i} className="result-card" style={{ '--cat-color': meta.color, margin: 0 }}>
+                                        <div className="result-header">
+                                            <div className="result-category-badge" style={{ background: meta.color + '22', border: `1px solid ${meta.color}66`, color: meta.color }}>
+                                                {meta.icon} {res.category}
+                                            </div>
+                                            <div className="result-confidence">
+                                                {Math.round((res.metadata?.confidence || 0) * 100)}% confident
+                                            </div>
+                                        </div>
+                                        <p className="result-summary">{res.metadata?.summary}</p>
+                                        <div className="result-actions">
+                                            {res.driveViewLink && (
+                                                <a href={res.driveViewLink} target="_blank" rel="noreferrer" className="result-action-btn drive">
+                                                    📁 View in Drive
+                                                </a>
+                                            )}
+                                            {res.calendarEventLink && (
+                                                <a href={res.calendarEventLink} target="_blank" rel="noreferrer" className="result-action-btn calendar">
+                                                    📅 Calendar Event Created
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
-                        <p className="result-summary">{result.metadata?.summary}</p>
-
-                        <div className="result-actions">
-                            {result.driveViewLink && (
-                                <a href={result.driveViewLink} target="_blank" rel="noreferrer" className="result-action-btn drive">
-                                    📁 View in Drive
-                                </a>
-                            )}
-                            {result.calendarEventLink && (
-                                <a href={result.calendarEventLink} target="_blank" rel="noreferrer" className="result-action-btn calendar">
-                                    📅 Calendar Event Created
-                                </a>
-                            )}
-                        </div>
-
-                        <button className="btn-upload-another" onClick={reset}>
+                        <button className="btn-upload-another" onClick={reset} style={{ marginTop: '1.5rem', width: '100%' }}>
                             + Upload Another
                         </button>
                     </motion.div>

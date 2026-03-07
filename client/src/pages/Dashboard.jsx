@@ -161,6 +161,19 @@ export default function Dashboard() {
                         <span>📸</span>
                         <span>{stats.total} Total</span>
                     </div>
+                    {billingStatus.tier === 'free' && (
+                        <motion.button
+                            className="upgrade-header-btn"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => {
+                                setUpgradeTrigger('manual')
+                                setShowUpgradeModal(true)
+                            }}
+                        >
+                            ✨ Upgrade to Pro
+                        </motion.button>
+                    )}
                 </div>
             </div>
 
