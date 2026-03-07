@@ -54,15 +54,17 @@ export default function useBilling() {
 
     /**
      * Handle upgrade to PRO
+     * @param {number} months - Subscription duration (1, 3, 6, or 12)
+     * @param {function} onSuccess - Callback on successful upgrade
      * Opens Lemon Squeezy checkout overlay and polls for payment success
      */
-    const handleUpgrade = async (onSuccess) => {
+    const handleUpgrade = async (months = 1, onSuccess) => {
         setIsLoading(true)
         setError(null)
 
         try {
-            // Step 1: Create checkout session
-            const { data } = await axios.post('/api/billing/checkout')
+            // Step 1: Create checkout session with selected duration
+            const { data } = await axios.post('/api/billing/checkout', { months })
             
             if (!data.checkoutUrl) {
                 throw new Error('Failed to create checkout session')

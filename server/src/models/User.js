@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
             lsSubscriptionId: String,
             status: {
                 type: String,
-                enum: ['none', 'active', 'payment_failed', 'cancelled', 'expired'],
+                enum: ['none', 'active', 'payment_failed', 'cancelled', 'expired', 'refunded'],
                 default: 'none',
             },
             currentPeriodEnd: Date,
